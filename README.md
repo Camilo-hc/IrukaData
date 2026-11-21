@@ -4,7 +4,7 @@ IrukaData es una aplicación en desarrollo para gestionar equipos de vóleibol y
 
 El proyecto prioriza el funcionamiento local y sin conexión, una interfaz en español y controles adecuados para notebook y tablet. Su objetivo es reunir acciones técnicas, marcador, rotaciones, sustituciones oficiales y reemplazos de líbero en un mismo panel de partido.
 
-**Estado actual:** la aplicación permite configurar un club, gestionar equipos y temporadas y asociarlos con almacenamiento local. El Hito 1 está en desarrollo: los perfiles de deportistas y las inscripciones todavía están pendientes, al igual que los torneos y el registro de partidos.
+**Estado actual:** la aplicación permite configurar un club, gestionar equipos y temporadas y mantener perfiles de deportistas con almacenamiento local. El Hito 1 está en desarrollo: las inscripciones todavía están pendientes, al igual que los torneos y el registro de partidos.
 
 ## Objetivos
 
@@ -21,7 +21,7 @@ Las siguientes funcionalidades forman parte del alcance previsto y **todavía no
 
 | Área | Alcance previsto |
 | --- | --- |
-| Jugadores e inscripciones | Perfiles únicos, inscripción en varias categorías y dorsales independientes; conservación del dorsal utilizado en cada partido. |
+| Inscripciones | Incorporación de perfiles existentes a varias categorías y temporadas, con dorsales independientes; conservación del dorsal utilizado en cada partido. |
 | Torneos | Competiciones asociadas a equipos y temporadas, con sus partidos e historial de resultados. |
 | Partidos y alineación | Convocatorias desde tarjetas de jugadores inscritos, seis titulares por posición, banca y designación de hasta dos líberos según el torneo. |
 | Registro en vivo | Secuencias de saque, recepción, ataque, bloqueo, defensa y colocación; resultados terminales que adjudican un único punto por jugada, puntos manuales, deshacer, guardado automático y reanudación. |
@@ -42,21 +42,23 @@ El registro individual se limitará a los jugadores del propio club. El rival se
 - Creación, consulta y edición de equipos masculinos y femeninos en Sub 14, Sub 16, Sub 18, Sub 21 y TC, con búsqueda y filtros por rama, categoría y temporada.
 - Creación y edición de temporadas con validación de fechas, y asociación de un equipo a varias temporadas.
 - Archivado y restauración de equipos y temporadas conservando sus identidades y asociaciones.
+- Creación, búsqueda, consulta y edición de perfiles de deportistas con nombre obligatorio, fecha de nacimiento y notas opcionales; archivado y restauración conservando el mismo ID.
+- Búsqueda de deportistas con o sin tildes y aviso de posibles perfiles existentes. Se permiten homónimos sin fusionar personas automáticamente por nombre o fecha de nacimiento.
 - Demostración estática de solo lectura con nombres y equipos ficticios; sus datos no se insertan en la base del club.
 - Estructura modular que separa dominio, estadísticas, aplicación, almacenamiento e interfaz.
 - Contratos tipados para identidad, inscripciones, reglas por partido, eventos, cambios y proyecciones estadísticas, junto a un catálogo central de 22 resultados técnicos.
-- Almacenamiento Dexie/IndexedDB para club, equipos, temporadas y sus asociaciones, con migración desde la estructura inicial, guardado transaccional y detección de ediciones desactualizadas entre pestañas.
+- Almacenamiento Dexie/IndexedDB para club, equipos, temporadas, sus asociaciones y deportistas, con migraciones que conservan los datos anteriores, guardado transaccional y detección de ediciones desactualizadas entre pestañas.
 - Manifiesto, iconos y caché PWA para cargar los recursos compilados sin conexión después de su preparación inicial, sin forzar la activación de nuevas versiones durante una sesión abierta.
 - Configuración de TypeScript estricto, lint, pruebas unitarias, pruebas de componentes, pruebas de navegador e integración continua.
 
-Los contratos y el catálogo son cimientos técnicos: todavía no existen perfiles editables de deportistas, inscripciones, torneos, un motor reglamentario operativo, registro de puntos, ejecución de cambios, cálculo de estadísticas ni exportación/importación de respaldos.
+Los contratos y el catálogo son cimientos técnicos: todavía no existen inscripciones, torneos, un motor reglamentario operativo, registro de puntos, ejecución de cambios, cálculo de estadísticas ni exportación/importación de respaldos. Los perfiles no contienen dorsal: este se asignará por inscripción en equipo y temporada.
 
 ## Etapas de desarrollo
 
 | Etapa | Objetivo | Estado |
 | --- | --- | --- |
 | Hito 0 — Especificación y cimientos | Estructura modular, contratos de dominio, catálogo de resultados, datos ficticios y herramientas de desarrollo y pruebas. | Implementado |
-| Hito 1 — Club, equipos y perfiles | Gestión de equipos, categorías, temporadas, deportistas e inscripciones con dorsal independiente. Equipos y temporadas disponibles; perfiles e inscripciones pendientes. | En desarrollo |
+| Hito 1 — Club, equipos y perfiles | Gestión de equipos, categorías, temporadas, deportistas e inscripciones con dorsal independiente. Equipos, temporadas y perfiles disponibles; inscripciones pendientes. | En desarrollo |
 | Hito 2 — Torneos, partidos y alineación | Competiciones, creación de partidos, convocatoria, seis titulares por posición y designación de líberos. | Planificado |
 | Hito 3 — Motor puro de partido | Estados de partido y jugada, puntuación, servicio, rotaciones y cierre de sets y partidos. | Planificado |
 | Hito 4 — Panel de anotación en vivo | Interfaz táctil para acciones y puntos, eventos recientes, deshacer, guardado automático y reanudación. | Planificado |
@@ -124,6 +126,6 @@ La descarga inicial del navegador de pruebas requiere internet. El build no desc
 
 ## Alcance actual del modo offline
 
-La caché offline disponible cubre los recursos de la aplicación. Después de su preparación inicial, la gestión de equipos y temporadas permite guardar datos y volver a consultarlos sin conexión. La demostración continúa separada de los datos reales del club. El guardado y la recuperación de partidos completos se incorporarán en etapas posteriores.
+La caché offline disponible cubre los recursos de la aplicación. Después de su preparación inicial, la gestión de equipos, temporadas y deportistas permite guardar datos y volver a consultarlos sin conexión. La demostración continúa separada de los datos reales del club. El guardado y la recuperación de partidos completos se incorporarán en etapas posteriores.
 
 IndexedDB pertenece al navegador y al dispositivo. Borrar los datos de la aplicación puede eliminar su almacenamiento local; la función de respaldo todavía está planificada. El uso como registro deportivo real deberá esperar a que estén implementados y verificados los flujos de partido y recuperación de datos.

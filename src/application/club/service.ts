@@ -1,9 +1,10 @@
 import type { Club, Season, Team } from '../../domain/club/contracts'
-import { validateName, validateSeason, validateTeam, type FieldErrors, type SeasonInput, type TeamInput } from '../../domain/club/validation'
+import { validateName, validateSeason, validateTeam, type SeasonInput, type TeamInput } from '../../domain/club/validation'
 import type { Id } from '../../domain/shared/types'
 import { CatalogError, type CatalogErrorCode, type ClubRepository } from './ports'
 
-export type SaveResult = { ok: true } | { ok: false; message: string; fields?: FieldErrors }
+import type { SaveResult } from '../shared/save-result'
+export type { SaveResult } from '../shared/save-result'
 const messages: Record<CatalogErrorCode, string> = {
   duplicate_team: 'Ya existe un equipo con ese nombre, rama y categoría. Revisa también los archivados.',
   duplicate_season: 'Ya existe una temporada con ese nombre. Revisa también las archivadas.',
