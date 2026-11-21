@@ -8,13 +8,15 @@ import { ClubForm } from '../club/ClubForms'
 import { useSave } from '../shared/useSave'
 import { AthleteForm } from './AthleteForm'
 import { useAthleteDirectory } from './useAthleteDirectory'
+import type { MembershipManagement } from '../../application/memberships/service'
+import { AthleteMemberships } from '../memberships/AthleteMemberships'
 
-interface Props { management: AthleteManagement; clubManagement: ClubManagement }
+interface Props { management: AthleteManagement; clubManagement: ClubManagement; membershipManagement: MembershipManagement }
 function birthDateLabel(athlete: Athlete): string {
   return athlete.birthDate ? athlete.birthDate.split('-').reverse().join('-') : 'No registrada'
 }
 
-export function AthletesPage({ management, clubManagement }: Props) {
+export function AthletesPage({ management, clubManagement, membershipManagement }: Props) {
   const { athleteId } = useParams<{ athleteId: string }>()
   const { directory, failed, retry } = useAthleteDirectory(management)
   const [editor, setEditor] = useState<Athlete | null | undefined>(undefined)
@@ -59,7 +61,8 @@ export function AthletesPage({ management, clubManagement }: Props) {
         {profile.active && <button className="button" disabled={editor !== undefined || mutation.busy} onClick={() => { setNotice(''); setEditor(profile) }}>Editar perfil</button>}
         <button className="button secondary" disabled={editor !== undefined || mutation.busy} onClick={() => archive(profile)}>{profile.active ? 'Archivar deportista' : 'Restaurar deportista'}</button>
       </div>
-      <p className="catalog-help">El dorsal se asignará en las inscripciones por equipo y temporada.</p>
+      <p className="catalog-help">El dorsal pertenece a cada inscripción de equipo y temporada.</p>
+      <AthleteMemberships athlete={profile} management={membershipManagement} />
     </article> : <>
       <div className="catalog-toolbar">
         <button className="button" disabled={editor !== undefined || mutation.busy} onClick={() => { setNotice(''); setEditor(null) }}>Nuevo deportista</button>

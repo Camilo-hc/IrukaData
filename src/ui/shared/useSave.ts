@@ -22,5 +22,5 @@ export function useSave(onSaved: (message: string) => void) {
       setBusy(false)
     }
   }
-  return { busy, result, run }
+  return { busy, result, run, clearResult: () => setResult(null) }
 }

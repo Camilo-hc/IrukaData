@@ -43,6 +43,7 @@ export interface RosterMembership {
   readonly jerseyNumber: number
   readonly usualRole: AthleteRole
   readonly active: boolean
+  readonly revision: number
 }
 export interface Competition {
   readonly id: Id<'Competition'>
