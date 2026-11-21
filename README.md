@@ -4,7 +4,7 @@ IrukaData es una aplicación en desarrollo para gestionar equipos de vóleibol y
 
 El proyecto prioriza el funcionamiento local y sin conexión, una interfaz en español y controles adecuados para notebook y tablet. Su objetivo es reunir acciones técnicas, marcador, rotaciones, sustituciones oficiales y reemplazos de líbero en un mismo panel de partido.
 
-**Estado actual:** la aplicación permite configurar un club, gestionar equipos y temporadas, mantener perfiles de deportistas e inscribirlos en distintas plantillas con dorsales independientes. El alcance del Hito 1 está implementado; los torneos, los partidos y las estadísticas deportivas continúan planificados.
+**Estado actual:** la aplicación permite configurar un club, gestionar equipos y temporadas, mantener perfiles de deportistas e inscribirlos en distintas plantillas con dorsales independientes. El Hito 1 está implementado. El Hito 2 está en desarrollo: ya se pueden gestionar torneos y asociar equipos de una misma temporada. Los partidos, las alineaciones y las estadísticas deportivas continúan planificados.
 
 ## Objetivos
 
@@ -21,7 +21,6 @@ Las siguientes funcionalidades forman parte del alcance previsto y **todavía no
 
 | Área | Alcance previsto |
 | --- | --- |
-| Torneos | Competiciones asociadas a equipos y temporadas, con sus partidos e historial de resultados. |
 | Partidos y alineación | Convocatorias desde tarjetas de jugadores inscritos, seis titulares por posición, banca y designación de hasta dos líberos según el torneo. |
 | Registro en vivo | Secuencias de saque, recepción, ataque, bloqueo, defensa y colocación; resultados terminales que adjudican un único punto por jugada, puntos manuales, deshacer, guardado automático y reanudación. |
 | Marcador y rotaciones | Partidos al mejor de tres sets, a 25/25/15 con dos puntos de ventaja; rotación al recuperar el servicio y nueva alineación inicial por set. |
@@ -48,16 +47,21 @@ El registro individual se limitará a los jugadores del propio club. El rival se
 - Dorsales enteros positivos y únicos entre las inscripciones activas de cada plantilla; no se impone todavía un rango reglamentario de torneo.
 - Edición, archivado y restauración de inscripciones con ID estable. Archivar libera el dorsal; restaurar exige que esté disponible y que el perfil, equipo, temporada y asociación estén activos.
 - Consulta desde la ficha de cada deportista de sus equipos, temporadas, dorsales, roles e inscripciones archivadas.
+- Creación, edición, búsqueda, archivado y restauración de torneos por temporada, con tipo de competición y notas opcionales.
+- Participación de varios equipos de la misma temporada en un torneo y de un equipo en varios torneos, con filtros y acceso desde la plantilla. Retirar y recuperar un equipo conserva el ID de su participación.
+- Nombres de torneo únicos por temporada, incluidos los archivados. La temporada de un torneo existente se conserva para proteger sus referencias.
 - Demostración estática de solo lectura con nombres y equipos ficticios; sus datos no se insertan en la base del club.
 - Estructura modular que separa dominio, estadísticas, aplicación, almacenamiento e interfaz.
 - Contratos tipados para identidad, inscripciones, reglas por partido, eventos, cambios y proyecciones estadísticas, junto a un catálogo central de 22 resultados técnicos.
-- Almacenamiento Dexie/IndexedDB para club, equipos, temporadas, sus asociaciones, deportistas e inscripciones, con migraciones que conservan los datos anteriores, guardado transaccional y detección de ediciones desactualizadas entre pestañas.
+- Almacenamiento Dexie/IndexedDB para club, equipos, temporadas, sus asociaciones, deportistas, inscripciones, torneos y participaciones, con migraciones que conservan los datos anteriores, guardado transaccional y detección de ediciones desactualizadas entre pestañas.
 - Manifiesto, iconos y caché PWA para cargar los recursos compilados sin conexión después de su preparación inicial, sin forzar la activación de nuevas versiones durante una sesión abierta.
 - Configuración de TypeScript estricto, lint, pruebas unitarias, pruebas de componentes, pruebas de navegador e integración continua.
 
-Los contratos y el catálogo son cimientos técnicos: todavía no existen torneos, un motor reglamentario operativo, registro de puntos, ejecución de cambios, cálculo de estadísticas ni exportación/importación de respaldos. Los perfiles no contienen dorsal: este pertenece a cada inscripción. La fotografía del dorsal usado en cada partido se incorporará al implementar los partidos.
+Los contratos y el catálogo son cimientos técnicos: todavía no existen partidos, un motor reglamentario operativo, registro de puntos, ejecución de cambios, cálculo de estadísticas ni exportación/importación de respaldos. Los perfiles no contienen dorsal: este pertenece a cada inscripción. La fotografía del dorsal usado en cada partido se incorporará al implementar los partidos.
 
 Archivar un perfil, equipo o temporada conserva sus inscripciones. Una inscripción activa sigue reservando su dorsal hasta archivarla explícitamente. El rol habitual de líbero no constituye una designación de líbero para un partido.
+
+Archivar un torneo conserva sus participaciones. Archivar un equipo o desvincular su temporada no retira automáticamente sus participaciones existentes; pueden conservarse o retirarse al editar el torneo. Añadir o recuperar una participación exige un equipo y asociación activos de la misma temporada. Con la temporada archivada, el torneo se puede consultar y archivar; para editarlo o restaurarlo hay que reactivar la temporada. El tipo de competición es descriptivo y todavía no configura reglas de juego.
 
 ## Etapas de desarrollo
 
@@ -65,7 +69,7 @@ Archivar un perfil, equipo o temporada conserva sus inscripciones. Una inscripci
 | --- | --- | --- |
 | Hito 0 — Especificación y cimientos | Estructura modular, contratos de dominio, catálogo de resultados, datos ficticios y herramientas de desarrollo y pruebas. | Implementado |
 | Hito 1 — Club, equipos y perfiles | Gestión de equipos, categorías, temporadas, deportistas e inscripciones con dorsal independiente. Un mismo perfil puede pertenecer a varias plantillas. | Implementado |
-| Hito 2 — Torneos, partidos y alineación | Competiciones, creación de partidos, convocatoria, seis titulares por posición y designación de líberos. | Planificado |
+| Hito 2 — Torneos, partidos y alineación | Competiciones, creación de partidos, convocatoria, seis titulares por posición y designación de líberos. | En desarrollo: torneos implementados; partidos y alineación pendientes |
 | Hito 3 — Motor puro de partido | Estados de partido y jugada, puntuación, servicio, rotaciones y cierre de sets y partidos. | Planificado |
 | Hito 4 — Panel de anotación en vivo | Interfaz táctil para acciones y puntos, eventos recientes, deshacer, guardado automático y reanudación. | Planificado |
 | Hito 5 — Cambios oficiales y reemplazos de líbero | Flujos de cambio dentro del panel, validación de elegibilidad y reingresos, límites configurables y seguimiento del vínculo líbero–jugador regular. | Planificado |
@@ -132,6 +136,6 @@ La descarga inicial del navegador de pruebas requiere internet. El build no desc
 
 ## Alcance actual del modo offline
 
-La caché offline disponible cubre los recursos de la aplicación. Después de su preparación inicial, la gestión de equipos, temporadas, deportistas e inscripciones permite guardar datos y volver a consultarlos sin conexión. La demostración continúa separada de los datos reales del club. El guardado y la recuperación de partidos completos se incorporarán en etapas posteriores.
+La caché offline disponible cubre los recursos de la aplicación. Después de su preparación inicial, la gestión de equipos, temporadas, deportistas, inscripciones y torneos permite guardar datos y volver a consultarlos sin conexión. La demostración continúa separada de los datos reales del club. El guardado y la recuperación de partidos completos se incorporarán en etapas posteriores.
 
 IndexedDB pertenece al navegador y al dispositivo. Borrar los datos de la aplicación puede eliminar su almacenamiento local; la función de respaldo todavía está planificada. El uso como registro deportivo real deberá esperar a que estén implementados y verificados los flujos de partido y recuperación de datos.
