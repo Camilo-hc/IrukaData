@@ -19,8 +19,8 @@ export const demoAthletes: readonly Athlete[] = [
   { id: id('demo-noa'), name: 'Noa Vega', active: true, revision: 1 },
 ]
 export const demoMemberships: readonly RosterMembership[] = [
-  { id: id('demo-r1'), athleteId: id('demo-alex'), teamSeasonId: id('demo-ts-sub14'), jerseyNumber: 5, usualRole: 'punta', active: true },
-  { id: id('demo-r2'), athleteId: id('demo-alex'), teamSeasonId: id('demo-ts-sub16'), jerseyNumber: 8, usualRole: 'punta', active: true },
-  { id: id('demo-r3'), athleteId: id('demo-sol'), teamSeasonId: id('demo-ts-sub16'), jerseyNumber: 2, usualRole: 'libero', active: true },
-  { id: id('demo-r4'), athleteId: id('demo-noa'), teamSeasonId: id('demo-ts-tc'), jerseyNumber: 10, usualRole: 'colocador', active: true },
+  { id: id('demo-r1'), athleteId: id('demo-alex'), teamSeasonId: id('demo-ts-sub14'), jerseyNumber: 5, usualRole: 'punta', active: true, revision: 1 },
+  { id: id('demo-r2'), athleteId: id('demo-alex'), teamSeasonId: id('demo-ts-sub16'), jerseyNumber: 8, usualRole: 'punta', active: true, revision: 1 },
+  { id: id('demo-r3'), athleteId: id('demo-sol'), teamSeasonId: id('demo-ts-sub16'), jerseyNumber: 2, usualRole: 'libero', active: true, revision: 1 },
+  { id: id('demo-r4'), athleteId: id('demo-noa'), teamSeasonId: id('demo-ts-tc'), jerseyNumber: 10, usualRole: 'colocador', active: true, revision: 1 },
 ]
