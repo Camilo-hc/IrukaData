@@ -11,6 +11,8 @@ import { DexieMembershipRepository } from './infrastructure/storage/membership-r
 import { createMembershipManagement } from './application/memberships/service'
 import { DexieCompetitionRepository } from './infrastructure/storage/competition-repository'
 import { createCompetitionManagement } from './application/competitions/service'
+import { DexieMatchRepository } from './infrastructure/storage/match-repository'
+import { createMatchManagement } from './application/matches/service'
 import './ui/styles.css'
 
 const database = new IrukaDatabase()
@@ -22,12 +24,13 @@ const athleteManagement = createAthleteManagement(new DexieAthleteRepository(dat
   const date = new Date()
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 })
+const matchManagement = createMatchManagement(new DexieMatchRepository(database), () => crypto.randomUUID())
 const container = document.getElementById('root')
 if (!container) throw new Error('No se encontró el contenedor de IrukaData.')
 
 // Composición: la UI recibe puertos; nunca conoce Dexie.
 createRoot(container).render(
   <StrictMode>
-    <HashRouter><App storageHealth={storageHealth} clubManagement={clubManagement} athleteManagement={athleteManagement} membershipManagement={membershipManagement} competitionManagement={competitionManagement} /></HashRouter>
+    <HashRouter><App storageHealth={storageHealth} clubManagement={clubManagement} athleteManagement={athleteManagement} membershipManagement={membershipManagement} competitionManagement={competitionManagement} matchManagement={matchManagement} /></HashRouter>
   </StrictMode>,
 )

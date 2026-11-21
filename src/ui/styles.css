@@ -123,6 +123,16 @@ a.season-tag { min-height: 44px; display: inline-flex; align-items: center; text
 @media (max-width: 760px) { .roster-grid, .athlete-candidates { grid-template-columns: 1fr; } }
 .competition-filters { grid-template-columns: 1fr 1fr 1.5fr; }
 .competition-notes { max-width: 320px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; font-weight: 400; margin: .5rem 0 0; }
+.match-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.match-card { background: #fff; border: 1px solid #d5e1e6; border-radius: 12px; padding: 1.5rem; overflow-wrap: anywhere; }
+.match-card h2 { margin-top: .8rem; font-size: 1.4rem; }
+.match-card h2 .text-link { min-height: 44px; }
+.match-card .row-actions { margin-top: 1rem; }
+.match-rules, .rules-summary { margin-top: 1.5rem; border-top: 1px solid #d5e1e6; padding-top: 1.2rem; }
+.match-rules legend { padding-top: 1.5rem; font-size: 1.2rem; }
+.match-rules .checkbox-label { margin-top: 1rem; }
+.match-scope { margin-top: 1.5rem; }
+@media (max-width: 760px) { .match-grid { grid-template-columns: 1fr; } }
 @media (min-width: 761px) { .app-header nav { flex-wrap: wrap; gap: .2rem 1.2rem; } }
 @media (max-width: 760px) { .competition-filters { grid-template-columns: 1fr; } }
 @media (max-width: 760px) {
