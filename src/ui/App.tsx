@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import type { StorageHealthPort, StorageStatus } from '../application/ports'
+import type { ClubManagement } from '../application/club/service'
+import { ClubPage } from './club/ClubPage'
+import type { AthleteManagement } from '../application/athletes/service'
+import { AthletesPage } from './athletes/AthletesPage'
+import type { MembershipManagement } from '../application/memberships/service'
+import { RostersPage } from './memberships/RostersPage'
 import { demoAthletes, demoClub, demoMemberships, demoSeason, demoTeams, demoTeamSeasons } from '../demo/data'
 
 function Home() {
@@ -8,14 +14,14 @@ function Home() {
     <div className="page-heading"><p className="eyebrow">TU CLUB, EN TU DISPOSITIVO</p>
       <h1>Todo comienza<br />con un buen equipo.</h1>
       <p className="lead">Equipos, partidos y estadísticas de vóleibol.<br className="wide-only" /> Una base local para acompañarte dentro y fuera de la cancha.</p>
-      <Link className="button" to="/demostracion">Explorar datos de ejemplo</Link>
+      <div className="form-actions"><Link className="button" to="/equipos">Gestionar equipos</Link><Link className="button secondary" to="/deportistas">Gestionar deportistas</Link><Link className="button secondary" to="/plantillas">Gestionar plantillas</Link><Link className="button secondary" to="/demostracion">Explorar datos de ejemplo</Link></div>
     </div>
     <section className="foundation" aria-labelledby="foundation-title">
-      <div className="section-heading"><div><p className="eyebrow">ESTADO DEL PROYECTO</p><h2 id="foundation-title">Los cimientos están listos</h2></div><span className="tag">Hito 0</span></div>
-      <p>Esta versión prepara la aplicación. La gestión de equipos y el registro de partidos se incorporarán en los siguientes hitos, previa aprobación.</p>
+      <div className="section-heading"><div><p className="eyebrow">PREPARA TU TEMPORADA</p><h2 id="foundation-title">Organiza tu club</h2></div><span className="tag">Gestión local</span></div>
+      <p>Gestiona equipos, temporadas y perfiles, e inscribe deportistas en distintas plantillas con sus propios dorsales. Los datos se guardan en este dispositivo. El registro de partidos se incorporará más adelante.</p>
       <div className="feature-grid">
-        <article><h3>En tu dispositivo</h3><p>Base preparada para trabajar sin conexión después de la primera carga de la versión compilada.</p></article>
-        <article><h3>Un perfil por persona</h3><p>Datos de ejemplo con inscripciones en distintas categorías y dorsales independientes.</p></article>
+        <article><h3>Equipos por categoría</h3><p>Organiza equipos masculinos y femeninos desde Sub 14 hasta TC, sin mezclar la demostración con tus datos.</p></article>
+        <article><h3>Un perfil, varias plantillas</h3><p>Inscribe a cada deportista en sus equipos y temporadas con dorsales independientes, conservando una sola ficha personal.</p></article>
         <article><h3>La cancha como prioridad</h3><p>El futuro panel reunirá acciones, cambios oficiales y líbero en una misma pantalla.</p></article>
       </div>
     </section>
@@ -40,7 +46,7 @@ function Demo() {
   </>
 }
 
-export function App({ storageHealth }: { storageHealth: StorageHealthPort }) {
+export function App({ storageHealth, clubManagement, athleteManagement, membershipManagement }: { storageHealth: StorageHealthPort; clubManagement: ClubManagement; athleteManagement: AthleteManagement; membershipManagement: MembershipManagement }) {
   const [storage, setStorage] = useState<StorageStatus | 'checking'>('checking')
   useEffect(() => {
     let active = true
@@ -53,8 +59,8 @@ export function App({ storageHealth }: { storageHealth: StorageHealthPort }) {
 
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Saltar al contenido</a>
-    <header className="app-header"><Link className="brand" to="/" aria-label="IrukaData, inicio"><img src="/icon.svg" alt="" width="42" height="42" /><span>Iruka<span className="brand-light">Data</span></span></Link><nav aria-label="Navegación principal"><NavLink to="/" end>Inicio</NavLink><NavLink to="/demostracion">Demostración</NavLink></nav><span className="local-label">Vóleibol · Local</span></header>
-    <main id="main-content"><Routes><Route path="/" element={<Home />} /><Route path="/demostracion" element={<Demo />} /><Route path="*" element={<div className="page-heading"><h1>Página no encontrada</h1><Link className="button" to="/">Volver al inicio</Link></div>} /></Routes></main>
-    <footer><span>IrukaData <span className="footer-divider">/</span> Hito 0 · Estructura inicial</span><span role="status" className={storage === 'unavailable' ? 'storage-warning' : ''}>{storage === 'ready' ? 'Almacenamiento local disponible' : storage === 'checking' ? 'Comprobando almacenamiento local…' : 'Almacenamiento local no disponible. No se pueden guardar datos.'}</span></footer>
+    <header className="app-header"><Link className="brand" to="/" aria-label="IrukaData, inicio"><img src="/icon.svg" alt="" width="42" height="42" /><span>Iruka<span className="brand-light">Data</span></span></Link><nav aria-label="Navegación principal"><NavLink to="/" end>Inicio</NavLink><NavLink to="/equipos">Equipos</NavLink><NavLink to="/temporadas">Temporadas</NavLink><NavLink to="/deportistas">Deportistas</NavLink><NavLink to="/plantillas">Plantillas</NavLink><NavLink to="/demostracion">Demostración</NavLink></nav><span className="local-label">Vóleibol · Local</span></header>
+    <main id="main-content"><Routes><Route path="/" element={<Home />} /><Route path="/equipos" element={<ClubPage key="teams" section="teams" management={clubManagement} />} /><Route path="/temporadas" element={<ClubPage key="seasons" section="seasons" management={clubManagement} />} /><Route path="/deportistas" element={<AthletesPage key="athletes" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} /><Route path="/deportistas/:athleteId" element={<AthletesPage key="athlete-profile" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} /><Route path="/plantillas" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} /><Route path="/plantillas/:teamSeasonId" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} /><Route path="/demostracion" element={<Demo />} /><Route path="*" element={<div className="page-heading"><h1>Página no encontrada</h1><Link className="button" to="/">Volver al inicio</Link></div>} /></Routes></main>
+    <footer><span>IrukaData <span className="footer-divider">/</span> Gestión local de vóleibol</span><span role="status" className={storage === 'unavailable' ? 'storage-warning' : ''}>{storage === 'ready' ? 'Almacenamiento local disponible' : storage === 'checking' ? 'Comprobando almacenamiento local…' : 'Almacenamiento local no disponible. No se pueden guardar datos.'}</span></footer>
   </div>
 }
