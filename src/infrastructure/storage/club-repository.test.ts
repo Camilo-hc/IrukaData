@@ -36,7 +36,7 @@ describe('gestión local de club, equipos y temporadas', () => {
     old.close()
     const { db } = workspace('iruka-upgrade')
     expect(await createStorageHealth(db).check()).toBe('ready')
-    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '4' })
+    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '5' })
     expect(await db.appMetadata.get('keep')).toEqual({ key: 'keep', value: 'conservar' })
     expect(await db.clubs.count()).toBe(0)
     expect(await db.teams.count()).toBe(0)

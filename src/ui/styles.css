@@ -121,3 +121,16 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .profile-memberships { border-top: 1px solid #d5e1e6; margin-top: 1.5rem; padding-top: 1.5rem; }
 a.season-tag { min-height: 44px; display: inline-flex; align-items: center; text-decoration: underline; }
 @media (max-width: 760px) { .roster-grid, .athlete-candidates { grid-template-columns: 1fr; } }
+.competition-filters { grid-template-columns: 1fr 1fr 1.5fr; }
+.competition-notes { max-width: 320px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; font-weight: 400; margin: .5rem 0 0; }
+@media (min-width: 761px) { .app-header nav { flex-wrap: wrap; gap: .2rem 1.2rem; } }
+@media (max-width: 760px) { .competition-filters { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .competition-table { overflow: visible; border: 0; background: transparent; }
+  .competition-table table, .competition-table tbody { display: block; }
+  .competition-table thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+  .competition-table tr { display: block; background: #fff; border: 1px solid #d5e1e6; border-radius: 10px; padding: .6rem 1.2rem; margin-bottom: 1rem; }
+  .competition-table tbody th, .competition-table td { display: block; border: 0; padding: .6rem 0; overflow-wrap: anywhere; }
+  .competition-table tbody th { font-size: 1.15rem; }
+  .competition-table td::before { content: attr(data-label); display: block; font-size: .875rem; font-weight: 600; color: #49616d; margin-bottom: .2rem; }
+}

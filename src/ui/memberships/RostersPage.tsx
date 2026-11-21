@@ -49,7 +49,7 @@ function RosterWorkspace({ management, clubManagement, teamSeasonId }: Props & {
   const memberships = directory.memberships.filter((membership) => membership.teamSeasonId === context.teamSeason.id && membership.active !== showArchived)
     .sort((a, b) => a.jerseyNumber - b.jerseyNumber || a.id.localeCompare(b.id))
   return <section className="club-page">
-    <div className="page-heading compact"><p className="eyebrow">{directory.club.name}</p><Link className="text-link" to="/plantillas">Volver a plantillas</Link><h1>{context.team.name}</h1><p className="lead">Plantel · {context.season.name}</p><span className="tag subtle">{BRANCHES[context.team.branch]} · {CATEGORIES[context.team.category]}</span></div>
+    <div className="page-heading compact"><p className="eyebrow">{directory.club.name}</p><Link className="text-link" to="/plantillas">Volver a plantillas</Link><h1>{context.team.name}</h1><p className="lead">Plantel · {context.season.name}</p><Link className="text-link" to={`/torneos?plantilla=${encodeURIComponent(context.teamSeason.id)}`}>Ver torneos de esta plantilla</Link><span className="tag subtle">{BRANCHES[context.team.branch]} · {CATEGORIES[context.team.category]}</span></div>
     {!active && <p className="notice">Esta plantilla está archivada o desvinculada. Puedes consultar y archivar inscripciones. Para inscribir, editar o restaurar, reactiva el equipo, la temporada y su asociación.</p>}
     {notice && <p className="notice" role="status">{notice}</p>}
     {mutation.result && !mutation.result.ok && <p className="form-error" role="alert">{mutation.result.message}</p>}

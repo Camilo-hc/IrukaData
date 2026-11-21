@@ -1,4 +1,4 @@
-export type FieldErrors = Readonly<Partial<Record<'name' | 'branch' | 'category' | 'start' | 'end' | 'birthDate' | 'notes' | 'athleteId' | 'teamSeasonId' | 'jerseyNumber' | 'usualRole', string>>>
+export type FieldErrors = Readonly<Partial<Record<'name' | 'branch' | 'category' | 'start' | 'end' | 'birthDate' | 'notes' | 'athleteId' | 'teamSeasonId' | 'jerseyNumber' | 'usualRole' | 'kind' | 'seasonId' | 'teamSeasonIds', string>>>
 export type Validation<T> = { ok: true; value: T } | { ok: false; fields: FieldErrors }
 
 export function normalizeName(name: string): string {
