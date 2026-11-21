@@ -11,6 +11,7 @@ export interface Athlete {
   readonly birthDate?: IsoDate
   readonly notes?: string
   readonly active: boolean
+  readonly revision: number
 }
 export interface Team {
   readonly id: Id<'Team'>

@@ -14,9 +14,9 @@ export const demoTeamSeasons: readonly TeamSeason[] = demoTeams.map((team) => ({
   id: id(`demo-ts-${team.category}`), teamId: team.id, seasonId: demoSeason.id, active: true,
 }))
 export const demoAthletes: readonly Athlete[] = [
-  { id: id('demo-alex'), name: 'Alex Marín', active: true },
-  { id: id('demo-sol'), name: 'Sol Ríos', active: true },
-  { id: id('demo-noa'), name: 'Noa Vega', active: true },
+  { id: id('demo-alex'), name: 'Alex Marín', active: true, revision: 1 },
+  { id: id('demo-sol'), name: 'Sol Ríos', active: true, revision: 1 },
+  { id: id('demo-noa'), name: 'Noa Vega', active: true, revision: 1 },
 ]
 export const demoMemberships: readonly RosterMembership[] = [
   { id: id('demo-r1'), athleteId: id('demo-alex'), teamSeasonId: id('demo-ts-sub14'), jerseyNumber: 5, usualRole: 'punta', active: true },

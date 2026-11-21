@@ -2,8 +2,8 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
 a { color: inherit; text-decoration: none; }
-a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #007d73; outline-offset: 4px; }
-button, input, select { font: inherit; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #007d73; outline-offset: 4px; }
+button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
 h1, h2, h3, p { margin-top: 0; }
@@ -67,7 +67,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; }
 .field { display: flex; flex-direction: column; gap: .4rem; }
 .field label, legend { font-weight: 600; }
-.field input, .field select { min-height: 48px; width: 100%; border: 1px solid #9eb5bf; border-radius: 7px; padding: .65rem .75rem; background: #fff; color: #183642; }
+.field input, .field select, .field textarea { min-height: 48px; width: 100%; border: 1px solid #9eb5bf; border-radius: 7px; padding: .65rem .75rem; background: #fff; color: #183642; }
 .field select { appearance: none; padding-right: 2.2rem; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23183642' stroke-width='2'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .75rem center; }
 .field [aria-invalid="true"] { border-color: #a43820; }
 .full-width { grid-column: 1 / -1; }
@@ -91,3 +91,14 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .empty-state { background: #fff; border: 1px dashed #9eb5bf; padding: 2rem; border-radius: 10px; color: #49616d; }
 @media (max-width: 1100px) { .app-header { gap: 1.8rem; } .local-label { display: none; } }
 @media (max-width: 760px) { nav { flex-wrap: wrap; gap: .5rem 1.2rem; flex-basis: 100%; } .form-grid, .catalog-filters { grid-template-columns: 1fr; } .editor-panel { padding: 1.2rem; } .catalog-toolbar .checkbox-label { margin-left: 0; } .club-page .section-heading { align-items: flex-start; flex-wrap: wrap; } }
+.field textarea { resize: vertical; min-height: 8rem; }
+.field-hint { color: #49616d; font-size: .875rem; }
+.athlete-search { max-width: 600px; }
+.athlete-page h1 { font-size: clamp(2rem, 4vw, 3rem); overflow-wrap: anywhere; }
+.athlete-profile { background: #fff; border: 1px solid #d5e1e6; border-radius: 12px; padding: 1.5rem; }
+.profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin: 1.5rem 0; }
+.profile-fields dt { color: #49616d; font-size: .875rem; margin-bottom: .35rem; }
+.profile-fields dd { margin: 0; overflow-wrap: anywhere; }
+.athlete-notes { white-space: pre-wrap; }
+.athlete-profile .catalog-help { margin: 1.5rem 0 0; }
+@media (max-width: 760px) { .profile-fields { grid-template-columns: 1fr; } }
