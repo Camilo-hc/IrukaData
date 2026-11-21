@@ -1,0 +1,52 @@
+import type { Id, IsoDate } from '../shared/types'
+
+export type Category = 'sub14' | 'sub16' | 'sub18' | 'sub21' | 'tc'
+export type Branch = 'masculino' | 'femenino'
+export type AthleteRole = 'colocador' | 'central' | 'punta' | 'opuesto' | 'libero' | 'sin_definir'
+
+export interface Club { readonly id: Id<'Club'>; readonly name: string }
+export interface Athlete {
+  readonly id: Id<'Athlete'>
+  readonly name: string
+  readonly birthDate?: IsoDate
+  readonly notes?: string
+  readonly active: boolean
+}
+export interface Team {
+  readonly id: Id<'Team'>
+  readonly clubId: Club['id']
+  readonly name: string
+  readonly branch: Branch
+  readonly category: Category
+}
+export interface Season {
+  readonly id: Id<'Season'>
+  readonly name: string
+  readonly start: IsoDate
+  readonly end: IsoDate
+}
+export interface TeamSeason {
+  readonly id: Id<'TeamSeason'>
+  readonly teamId: Team['id']
+  readonly seasonId: Season['id']
+}
+export interface RosterMembership {
+  readonly id: Id<'RosterMembership'>
+  readonly athleteId: Athlete['id']
+  readonly teamSeasonId: TeamSeason['id']
+  readonly jerseyNumber: number
+  readonly usualRole: AthleteRole
+  readonly active: boolean
+}
+export interface Competition {
+  readonly id: Id<'Competition'>
+  readonly name: string
+  readonly kind: string
+  readonly seasonId: Season['id']
+  readonly notes?: string
+}
+export interface CompetitionEntry {
+  readonly id: Id<'CompetitionEntry'>
+  readonly teamSeasonId: TeamSeason['id']
+  readonly competitionId: Competition['id']
+}
