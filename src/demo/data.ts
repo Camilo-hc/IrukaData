@@ -3,15 +3,15 @@ import type { Id } from '../domain/shared/types'
 
 // IDs fijos y datos ficticios: nunca se insertan automáticamente en IndexedDB.
 const id = <T extends string>(value: string) => value as Id<T>
-export const demoClub: Club = { id: id('demo-club'), name: 'Club Iruka · Demostración' }
-export const demoSeason: Season = { id: id('demo-2026'), name: 'Temporada 2026', start: '2026-01-01', end: '2026-12-31' }
+export const demoClub: Club = { id: id('demo-club'), name: 'Club Iruka · Demostración', revision: 1 }
+export const demoSeason: Season = { id: id('demo-2026'), name: 'Temporada 2026', start: '2026-01-01', end: '2026-12-31', active: true, revision: 1 }
 export const demoTeams: readonly Team[] = [
-  { id: id('demo-sub14'), clubId: demoClub.id, name: 'Iruka Sub 14', branch: 'femenino', category: 'sub14' },
-  { id: id('demo-sub16'), clubId: demoClub.id, name: 'Iruka Sub 16', branch: 'femenino', category: 'sub16' },
-  { id: id('demo-tc'), clubId: demoClub.id, name: 'Iruka TC', branch: 'masculino', category: 'tc' },
+  { id: id('demo-sub14'), clubId: demoClub.id, name: 'Iruka Sub 14', branch: 'femenino', category: 'sub14', active: true, revision: 1 },
+  { id: id('demo-sub16'), clubId: demoClub.id, name: 'Iruka Sub 16', branch: 'femenino', category: 'sub16', active: true, revision: 1 },
+  { id: id('demo-tc'), clubId: demoClub.id, name: 'Iruka TC', branch: 'masculino', category: 'tc', active: true, revision: 1 },
 ]
 export const demoTeamSeasons: readonly TeamSeason[] = demoTeams.map((team) => ({
-  id: id(`demo-ts-${team.category}`), teamId: team.id, seasonId: demoSeason.id,
+  id: id(`demo-ts-${team.category}`), teamId: team.id, seasonId: demoSeason.id, active: true,
 }))
 export const demoAthletes: readonly Athlete[] = [
   { id: id('demo-alex'), name: 'Alex Marín', active: true },
