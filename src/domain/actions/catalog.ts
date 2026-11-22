@@ -50,3 +50,9 @@ export type TechnicalAction = {
     result: keyof typeof ACTION_CATALOG[K]['results']
   }>
 }[keyof typeof ACTION_CATALOG]
+
+export function technicalResult(action: TechnicalAction): ResultDefinition | undefined {
+  if (!Object.hasOwn(ACTION_CATALOG, action.action)) return undefined
+  const results: Readonly<Record<string, ResultDefinition>> = ACTION_CATALOG[action.action].results
+  return Object.hasOwn(results, action.result) ? results[action.result] : undefined
+}
