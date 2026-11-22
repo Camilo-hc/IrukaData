@@ -1,4 +1,4 @@
-/** Contrato de configuración; no valida ni ejecuta reglas en Hito 0. */
+/** Configuración versionada; la ejecución del reglamento corresponde al motor de partido. */
 export interface RulesSnapshot {
   readonly schemaVersion: 1
   readonly profileId: string
