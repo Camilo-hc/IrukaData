@@ -4,7 +4,7 @@ IrukaData es una aplicación en desarrollo para gestionar equipos de vóleibol y
 
 El proyecto prioriza el funcionamiento local y sin conexión, una interfaz en español y controles adecuados para notebook y tablet. Su objetivo es reunir acciones técnicas, marcador, rotaciones, sustituciones oficiales y reemplazos de líbero en un mismo panel de partido.
 
-**Estado actual:** la aplicación permite configurar un club, gestionar equipos y temporadas, mantener perfiles de deportistas e inscribirlos en distintas plantillas con dorsales independientes. El Hito 1 está implementado. El Hito 2 permite gestionar torneos, programar partidos, guardar sus convocatorias y preparar el primer set con seis titulares y el equipo al saque. El motor de partido, la anotación en vivo y las estadísticas deportivas continúan planificados.
+**Estado actual:** la aplicación permite configurar un club, gestionar equipos y temporadas, mantener perfiles de deportistas e inscribirlos en distintas plantillas con dorsales independientes. El Hito 1 está implementado. El Hito 2 permite gestionar torneos, programar partidos, guardar sus convocatorias y preparar el primer set con seis titulares y el equipo al saque. El motor del Hito 3 ya calcula jugadas, puntos y rotaciones como módulo de dominio. La interfaz seguirá llegando hasta la preparación del primer set mientras se incorpora el panel en vivo.
 
 ## Objetivos
 
@@ -55,6 +55,8 @@ El registro individual se limitará a los jugadores del propio club. El rival se
 - Archivado y restauración de borradores con ID estable, sin cambiar su equipo o torneo al editarlos. Los datos y las reglas pueden corregirse mientras el partido siga en borrador. El primer guardado de la convocatoria cierra esa etapa. La selección de deportistas y la designación de líberos siguen editables hasta confirmar la alineación inicial.
 - Convocatoria desde tarjetas de deportistas con perfil e inscripción activos en la plantilla del partido. Se guardan nombre, dorsal y designación de líbero para ese encuentro. La validación aplica los cupos del partido y exige seis deportistas sin designación de líbero.
 - Alineación inicial del primer set con tarjetas de convocados, seis posiciones únicas, banca automática y líberos separados. La confirmación guarda el primer servicio y deja el set pendiente, listo para el saque. Se puede corregir antes de iniciar el set.
+- Motor de partido independiente de React e IndexedDB. Aplica el catálogo de acciones y los puntos manuales, conserva o transfiere el servicio, rota al recuperar el saque propio y cierra sets y partidos al mejor de tres.
+- Lotes de eventos que permiten reconstruir el estado del motor. Cada comando verifica la versión del partido y, al puntuar, la jugada vigente. La interfaz y el almacenamiento del historial en vivo están previstos para el Hito 4.
 - Demostración estática de solo lectura con nombres y equipos ficticios; sus datos no se insertan en la base del club.
 - Estructura modular que separa dominio, estadísticas, aplicación, almacenamiento e interfaz.
 - Contratos tipados para identidad, inscripciones, reglas por partido, eventos, cambios y proyecciones estadísticas, junto a un catálogo central de 22 resultados técnicos.
@@ -62,7 +64,7 @@ El registro individual se limitará a los jugadores del propio club. El rival se
 - Manifiesto, iconos y caché PWA para cargar los recursos compilados sin conexión después de su preparación inicial, sin forzar la activación de nuevas versiones durante una sesión abierta.
 - Configuración de TypeScript estricto, lint, pruebas unitarias, pruebas de componentes, pruebas de navegador e integración continua.
 
-Los contratos y el catálogo son cimientos técnicos: todavía no hay un motor reglamentario operativo, registro de puntos, ejecución de cambios, cálculo de estadísticas ni exportación/importación de respaldos. Los perfiles no contienen dorsal: este pertenece a cada inscripción. La convocatoria conserva el dorsal y el nombre guardados para el partido aunque cambie el perfil o la inscripción.
+La aplicación permite preparar partidos y su primer set. El panel para registrar acciones y recuperar partidos en juego, las sustituciones, los reemplazos de líbero, las estadísticas y los respaldos se incorporarán en etapas posteriores. Los perfiles no contienen dorsal: este pertenece a cada inscripción. La convocatoria conserva el dorsal y el nombre guardados para el partido aunque cambie el perfil o la inscripción.
 
 Archivar un perfil, equipo o temporada conserva sus inscripciones. Una inscripción activa sigue reservando su dorsal hasta archivarla explícitamente. El rol habitual de líbero no constituye una designación de líbero para un partido.
 
@@ -77,7 +79,7 @@ Los partidos requieren una participación, torneo, equipo, asociación y tempora
 | Hito 0 — Especificación y cimientos | Estructura modular, contratos de dominio, catálogo de resultados, datos ficticios y herramientas de desarrollo y pruebas. | Implementado |
 | Hito 1 — Club, equipos y perfiles | Gestión de equipos, categorías, temporadas, deportistas e inscripciones con dorsal independiente. Un mismo perfil puede pertenecer a varias plantillas. | Implementado |
 | Hito 2 — Torneos, partidos y alineación | Competiciones, creación de partidos, convocatoria, seis titulares por posición y designación de líberos. | Implementado hasta la preparación del primer set |
-| Hito 3 — Motor puro de partido | Estados de partido y jugada, puntuación, servicio, rotaciones y cierre de sets y partidos. | Planificado |
+| Hito 3 — Motor puro de partido | Estados de partido y jugada, puntuación, servicio, rotaciones y cierre de sets y partidos. | Motor implementado y probado como módulo |
 | Hito 4 — Panel de anotación en vivo | Interfaz táctil para acciones y puntos, eventos recientes, deshacer, guardado automático y reanudación. | Planificado |
 | Hito 5 — Cambios oficiales y reemplazos de líbero | Flujos de cambio dentro del panel, validación de elegibilidad y reingresos, límites configurables y seguimiento del vínculo líbero–jugador regular. | Planificado |
 | Hito 6 — Estadísticas, historial y respaldo | Estadísticas derivadas de eventos, filtros, consulta del historial y exportación/importación de respaldos. | Planificado |
