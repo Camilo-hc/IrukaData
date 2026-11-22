@@ -51,9 +51,12 @@ export interface Competition {
   readonly kind: string
   readonly seasonId: Season['id']
   readonly notes?: string
+  readonly active: boolean
+  readonly revision: number
 }
 export interface CompetitionEntry {
   readonly id: Id<'CompetitionEntry'>
   readonly teamSeasonId: TeamSeason['id']
   readonly competitionId: Competition['id']
+  readonly active: boolean
 }

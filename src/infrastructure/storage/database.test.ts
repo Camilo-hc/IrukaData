@@ -13,7 +13,7 @@ describe('base IndexedDB de infraestructura', () => {
     expect(await createStorageHealth(database).check()).toBe('ready')
     database.close()
     await database.open()
-    expect(await database.appMetadata.toArray()).toEqual([{ key: 'schemaVersion', value: '4' }])
+    expect(await database.appMetadata.toArray()).toEqual([{ key: 'schemaVersion', value: '8' }])
     expect(await database.clubs.count()).toBe(0)
     expect(await database.teams.count()).toBe(0)
     expect(await database.seasons.count()).toBe(0)

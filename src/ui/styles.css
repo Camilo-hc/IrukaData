@@ -121,3 +121,47 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .profile-memberships { border-top: 1px solid #d5e1e6; margin-top: 1.5rem; padding-top: 1.5rem; }
 a.season-tag { min-height: 44px; display: inline-flex; align-items: center; text-decoration: underline; }
 @media (max-width: 760px) { .roster-grid, .athlete-candidates { grid-template-columns: 1fr; } }
+.competition-filters { grid-template-columns: 1fr 1fr 1.5fr; }
+.competition-notes { max-width: 320px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; font-weight: 400; margin: .5rem 0 0; }
+.match-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.match-card { background: #fff; border: 1px solid #d5e1e6; border-radius: 12px; padding: 1.5rem; overflow-wrap: anywhere; }
+.match-card h2 { margin-top: .8rem; font-size: 1.4rem; }
+.match-card h2 .text-link { min-height: 44px; }
+.match-card .row-actions { margin-top: 1rem; }
+.match-rules, .rules-summary { margin-top: 1.5rem; border-top: 1px solid #d5e1e6; padding-top: 1.2rem; }
+.match-rules legend { padding-top: 1.5rem; font-size: 1.2rem; }
+.match-rules .checkbox-label { margin-top: 1rem; }
+.call-up-panel { margin-top: 1.5rem; }
+.call-up-count { font-weight: 600; }
+.call-up-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: .75rem; padding: 0; list-style: none; }
+.call-up-person { display: grid; align-content: start; gap: .35rem; border: 1px solid #d5e1e6; border-radius: 8px; padding: .75rem; overflow-wrap: anywhere; }
+.call-up-person .athlete-choice { width: 100%; }
+.call-up-person .athlete-choice .jersey { font-size: 1.1rem; color: #006c62; }
+.call-up-person .checkbox-label { font-size: .9rem; }
+.lineup-panel { margin-top: 1.5rem; }
+.lineup-court { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; max-width: 42rem; padding: .65rem; background: #e9f2f4; border-radius: 10px; }
+.lineup-net { grid-column: 1 / -1; text-align: center; border-bottom: 2px solid #416776; margin: 0; font-size: .875rem; font-weight: 700; }
+.lineup-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; min-width: 0; min-height: 88px; padding: .55rem .3rem; border: 1px solid #91adb9; border-radius: 8px; background: #fff; color: #183642; text-align: center; overflow-wrap: anywhere; }
+button.lineup-slot[aria-pressed="true"] { border-color: #00766b; outline: 2px solid #00766b; background: #e1f4ef; }
+.lineup-slot > span:first-child { font-size: .85rem; font-weight: 600; }
+@media (max-width: 425px) { .lineup-slot > span:last-child { font-size: .875rem; } }
+.lineup-clear { margin-top: .65rem; }
+.lineup-choice { width: 100%; }
+.lineup-reserves { display: flex; flex-wrap: wrap; gap: 1rem 2.25rem; margin: 1.25rem 0; }
+.lineup-reserves h3 { margin: 0 0 .35rem; }
+.lineup-reserves ul { list-style: none; padding: 0; margin: 0; }
+.lineup-reserves li { display: flex; gap: .5rem; overflow-wrap: anywhere; }
+.lineup-reserves p { margin: 0; }
+.lineup-service .checkbox-label { overflow-wrap: anywhere; }
+@media (max-width: 760px) { .match-grid { grid-template-columns: 1fr; } }
+@media (min-width: 761px) { .app-header nav { flex-wrap: wrap; gap: .2rem 1.2rem; } }
+@media (max-width: 760px) { .competition-filters { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .competition-table { overflow: visible; border: 0; background: transparent; }
+  .competition-table table, .competition-table tbody { display: block; }
+  .competition-table thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+  .competition-table tr { display: block; background: #fff; border: 1px solid #d5e1e6; border-radius: 10px; padding: .6rem 1.2rem; margin-bottom: 1rem; }
+  .competition-table tbody th, .competition-table td { display: block; border: 0; padding: .6rem 0; overflow-wrap: anywhere; }
+  .competition-table tbody th { font-size: 1.15rem; }
+  .competition-table td::before { content: attr(data-label); display: block; font-size: .875rem; font-weight: 600; color: #49616d; margin-bottom: .2rem; }
+}

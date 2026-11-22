@@ -6,6 +6,8 @@ import type { StorageHealthPort } from '../application/ports'
 import type { ClubManagement } from '../application/club/service'
 import type { AthleteManagement } from '../application/athletes/service'
 import type { MembershipManagement } from '../application/memberships/service'
+import type { CompetitionManagement } from '../application/competitions/service'
+import type { MatchManagement } from '../application/matches/service'
 
 const available: StorageHealthPort = { check: async () => 'ready' }
 const management: ClubManagement = {
@@ -24,9 +26,20 @@ const athletes: AthleteManagement = {
 
 const memberships: MembershipManagement = { observe: () => () => {}, save: async () => ({ ok: true }), setActive: async () => ({ ok: true }) }
 
+const competitions: CompetitionManagement = { observe: () => () => {}, save: async () => ({ ok: true }), setActive: async () => ({ ok: true }) }
+
+const matches: MatchManagement = {
+  observe: () => () => {},
+  observeCallUp: () => () => {},
+  save: async () => ({ ok: true }),
+  saveCallUp: async () => ({ ok: true }),
+  saveInitialLineup: async () => ({ ok: true }),
+  setActive: async () => ({ ok: true }),
+}
+
 describe('pantalla inicial', () => {
   it('muestra el alcance y permite consultar la demostración', async () => {
-    render(<MemoryRouter><App storageHealth={available} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} /></MemoryRouter>)
+    render(<MemoryRouter><App storageHealth={available} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} competitionManagement={competitions} matchManagement={matches} /></MemoryRouter>)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Todo comienza')
     expect(await screen.findByRole('status')).toHaveTextContent('Almacenamiento local disponible')
     fireEvent.click(screen.getByRole('link', { name: 'Explorar datos de ejemplo' }))
@@ -37,12 +50,12 @@ describe('pantalla inicial', () => {
   })
 
   it('explica que no podrá guardar si IndexedDB no está disponible', async () => {
-    render(<MemoryRouter><App storageHealth={{ check: async () => 'unavailable' }} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} /></MemoryRouter>)
+    render(<MemoryRouter><App storageHealth={{ check: async () => 'unavailable' }} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} competitionManagement={competitions} matchManagement={matches} /></MemoryRouter>)
     expect(await screen.findByText(/No se pueden guardar datos/)).toBeVisible()
   })
 
   it('ofrece volver al inicio desde una ruta desconocida', async () => {
-    render(<MemoryRouter initialEntries={['/inexistente']}><App storageHealth={available} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/inexistente']}><App storageHealth={available} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} competitionManagement={competitions} matchManagement={matches} /></MemoryRouter>)
     expect(screen.getByRole('heading', { name: 'Página no encontrada' })).toBeVisible()
     expect(await screen.findByRole('status')).toHaveTextContent('Almacenamiento local disponible')
   })

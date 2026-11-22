@@ -51,7 +51,7 @@ describe('perfiles persistentes de deportistas', () => {
     expect(await db.teams.toArray()).toEqual([team])
     expect(await db.seasons.toArray()).toEqual([season])
     expect(await db.teamSeasons.toArray()).toEqual([link])
-    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '4' })
+    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '8' })
     expect(await db.appMetadata.get('keep')).toEqual({ key: 'keep', value: 'conservar' })
   })
 
