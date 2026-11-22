@@ -1,4 +1,5 @@
 import type { Match } from '../../domain/match/contracts'
+import type { CallUpSelection } from '../../domain/match/call-up'
 import { validateMatch, type MatchInput } from '../../domain/match/validation'
 import { validateRules, type RulesInput } from '../../domain/rules/configuration'
 import type { Id } from '../../domain/shared/types'
@@ -10,16 +11,24 @@ const messages: Record<MatchErrorCode, string> = {
   invalid_reference: 'El torneo, equipo o temporada ya no está activo o su participación fue retirada. Reactiva las referencias antes de guardar.',
   immutable_entry: 'El equipo y el torneo de un partido existente no se pueden cambiar. Crea otro partido para una participación distinta.',
   not_draft: 'Solo se pueden editar, archivar o restaurar partidos en borrador.',
+  call_up_locked: 'Este partido ya no permite editar la convocatoria.',
+  invalid_candidate: 'Cambió un perfil o una inscripción de la plantilla. Revisa la selección y vuelve a guardar.',
+  invalid_call_up: 'Revisa los deportistas y las designaciones de líbero de la convocatoria.',
   unavailable: 'No se pudo guardar el partido en este dispositivo. Conserva el formulario y vuelve a intentarlo.',
 }
 
 export function createMatchManagement(repository: MatchRepository, newId: () => string) {
   async function persist(operation: () => Promise<void>): Promise<SaveResult> {
     try { await operation(); return { ok: true } }
-    catch (error) { return { ok: false, message: messages[error instanceof MatchError ? error.code : 'unavailable'] } }
+    catch (error) {
+      return { ok: false, message: error instanceof MatchError ? error.detail ?? messages[error.code] : messages.unavailable }
+    }
   }
   return {
     observe: repository.observe.bind(repository),
+    observeCallUp: repository.observeCallUp.bind(repository),
+    saveCallUp: (match: Match, selection: readonly CallUpSelection[]) =>
+      persist(() => repository.saveCallUp(match.id, match.version, selection)),
     async save(input: MatchInput, rulesInput: RulesInput, current: Match | null): Promise<SaveResult> {
       const details = validateMatch(input)
       const rules = validateRules(rulesInput)

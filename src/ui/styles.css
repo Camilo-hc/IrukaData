@@ -131,7 +131,13 @@ a.season-tag { min-height: 44px; display: inline-flex; align-items: center; text
 .match-rules, .rules-summary { margin-top: 1.5rem; border-top: 1px solid #d5e1e6; padding-top: 1.2rem; }
 .match-rules legend { padding-top: 1.5rem; font-size: 1.2rem; }
 .match-rules .checkbox-label { margin-top: 1rem; }
-.match-scope { margin-top: 1.5rem; }
+.call-up-panel { margin-top: 1.5rem; }
+.call-up-count { font-weight: 600; }
+.call-up-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: .75rem; padding: 0; list-style: none; }
+.call-up-person { display: grid; align-content: start; gap: .35rem; border: 1px solid #d5e1e6; border-radius: 8px; padding: .75rem; overflow-wrap: anywhere; }
+.call-up-person .athlete-choice { width: 100%; }
+.call-up-person .athlete-choice .jersey { font-size: 1.1rem; color: #006c62; }
+.call-up-person .checkbox-label { font-size: .9rem; }
 @media (max-width: 760px) { .match-grid { grid-template-columns: 1fr; } }
 @media (min-width: 761px) { .app-header nav { flex-wrap: wrap; gap: .2rem 1.2rem; } }
 @media (max-width: 760px) { .competition-filters { grid-template-columns: 1fr; } }

@@ -28,7 +28,13 @@ const memberships: MembershipManagement = { observe: () => () => {}, save: async
 
 const competitions: CompetitionManagement = { observe: () => () => {}, save: async () => ({ ok: true }), setActive: async () => ({ ok: true }) }
 
-const matches: MatchManagement = { observe: () => () => {}, save: async () => ({ ok: true }), setActive: async () => ({ ok: true }) }
+const matches: MatchManagement = {
+  observe: () => () => {},
+  observeCallUp: () => () => {},
+  save: async () => ({ ok: true }),
+  saveCallUp: async () => ({ ok: true }),
+  setActive: async () => ({ ok: true }),
+}
 
 describe('pantalla inicial', () => {
   it('muestra el alcance y permite consultar la demostración', async () => {
