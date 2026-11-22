@@ -61,6 +61,7 @@ function MatchWorkspace({ management, competitionId, matchId }: { management: Ma
         key={selected.id}
         match={selected}
         teamSeasonId={selectedContext?.teamSeason.id}
+        teamName={selectedContext?.team.name ?? 'Equipo propio'}
         canEdit={selected.active && !editor && !mutation.busy && participationIsActive(selectedContext)}
         management={management}
       />

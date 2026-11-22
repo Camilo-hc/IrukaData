@@ -5,6 +5,7 @@ import type { MatchManagement } from '../../application/matches/service'
 import { requiredLiberos, type CallUpSelection } from '../../domain/match/call-up'
 import type { Match, MatchRoster } from '../../domain/match/contracts'
 import { useSave } from '../shared/useSave'
+import { LineupPanel } from './LineupPanel'
 
 type MembershipId = MatchRoster['rosterMembershipId']
 type Selected = ReadonlyMap<MembershipId, boolean>
@@ -12,11 +13,12 @@ type Selected = ReadonlyMap<MembershipId, boolean>
 interface Props {
   match: Match
   teamSeasonId: string | undefined
+  teamName: string
   canEdit: boolean
   management: MatchManagement
 }
 
-export function CallUpPanel({ match, teamSeasonId, canEdit, management }: Props) {
+export function CallUpPanel({ match, teamSeasonId, teamName, canEdit, management }: Props) {
   const [directory, setDirectory] = useState<CallUpDirectory | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -33,7 +35,7 @@ export function CallUpPanel({ match, teamSeasonId, canEdit, management }: Props)
   const candidates = directory?.candidates
   const canOpen = synchronized && Boolean(candidates?.length)
 
-  return <section className="athlete-profile call-up-panel" aria-labelledby="call-up-title">
+  return <><section className="athlete-profile call-up-panel" aria-labelledby="call-up-title">
     <h2 id="call-up-title">Convocatoria</h2>
     {failed ? <div>
       <p role="alert">No se pudo leer la convocatoria de este dispositivo.</p>
@@ -73,6 +75,14 @@ export function CallUpPanel({ match, teamSeasonId, canEdit, management }: Props)
       </>}
     </>}
   </section>
+    {directory && !failed && <LineupPanel
+      directory={directory}
+      match={match}
+      teamName={teamName}
+      canEdit={canEdit && !editorMatch}
+      management={management}
+    />}
+  </>
 }
 
 function CallUpEditor({ directory, match, management, editable, onCancel, onSaved }: {

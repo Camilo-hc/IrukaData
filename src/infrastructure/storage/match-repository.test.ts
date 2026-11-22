@@ -6,6 +6,7 @@ import { createCompetitionManagement } from '../../application/competitions/serv
 import { DEFAULT_RULES_INPUT, rulesToInput, validateRules } from '../../domain/rules/configuration'
 import type { Match } from '../../domain/match/contracts'
 import type { CallUpSelection } from '../../domain/match/call-up'
+import { POSITIONS, type LineupInput } from '../../domain/match/lineup'
 import type { Id } from '../../domain/shared/types'
 import { DexieClubRepository } from './club-repository'
 import { DexieCompetitionRepository } from './competition-repository'
@@ -56,14 +57,15 @@ afterEach(async () => {
 })
 
 describe('partidos asociados a torneos', () => {
-  it('migra desde v6 conservando partidos, reglas y todas las tablas anteriores', async () => {
+  it('migra desde v7 conservando partidos, reglas, convocatorias y tablas anteriores', async () => {
     const old = new Dexie('iruka-matches-upgrade')
-    old.version(6).stores({
+    old.version(7).stores({
       appMetadata: '&key', clubs: '&id', teams: '&id, clubId, &[clubId+branch+category+nameKey]',
       seasons: '&id, &nameKey', teamSeasons: '&id, &[teamId+seasonId], teamId, seasonId', athletes: '&id, searchKey',
       memberships: '&id, athleteId, teamSeasonId, &[teamSeasonId+athleteId], &[teamSeasonId+activeJerseyNumber]',
       competitions: '&id, seasonId, &[seasonId+nameKey]', competitionEntries: '&id, competitionId, teamSeasonId, &[competitionId+teamSeasonId]',
       matches: '&id, competitionEntryId, scheduledAt',
+      matchRosters: '&id, matchId, &[matchId+athleteId]',
     })
     const rules = validateRules(DEFAULT_RULES_INPUT)
     if (!rules.ok) throw new Error('El perfil de prueba debe ser válido.')
@@ -78,18 +80,19 @@ describe('partidos asociados a torneos', () => {
       competitionEntries: { id: 'e', competitionId: 'c', teamSeasonId: 'ts', active: true },
       matches: {
         id: 'm1', competitionEntryId: 'e', opponentName: 'Club Costa', scheduledAt: '2026-11-21T19:30',
-        venue: 'Gimnasio Norte', location: 'local', stage: '', phase: 'BORRADOR', active: true,
-        version: 1, rulesSnapshot: rules.value,
+        venue: 'Gimnasio Norte', location: 'local', stage: '', phase: 'CONVOCATORIA', active: true,
+        version: 2, rulesSnapshot: rules.value,
       },
+      matchRosters: { id: 'r', matchId: 'm1', athleteId: 'a', rosterMembershipId: 'm', nameSnapshot: 'Persona existente', jerseyNumberSnapshot: 5, calledUp: true, designatedLibero: false },
     }
     for (const [table, record] of Object.entries(records)) await old.table(table).add(record)
-    await old.table('appMetadata').bulkPut([{ key: 'schemaVersion', value: '6' }, { key: 'keep', value: 'conservar' }])
+    await old.table('appMetadata').bulkPut([{ key: 'schemaVersion', value: '7' }, { key: 'keep', value: 'conservar' }])
     old.close()
     const { db, repository } = workspace('iruka-matches-upgrade')
     expect((await repository.read()).matches).toEqual([records.matches])
-    expect(await db.matchRosters.count()).toBe(0)
+    expect(await db.matchSets.count()).toBe(0)
     for (const [table, record] of Object.entries(records)) expect(await db.table(table).toArray()).toEqual([record])
-    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '7' })
+    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '8' })
     expect(await db.appMetadata.get('keep')).toEqual({ key: 'keep', value: 'conservar' })
   })
 
@@ -291,5 +294,79 @@ describe('convocatoria por plantilla', () => {
     await db.matches.update(match.id, { phase: 'ALINEACION_SET' })
     expect(await management.saveCallUp(match, selection)).toMatchObject({ ok: false, message: expect.stringContaining('no permite editar la convocatoria') })
     expect((await repository.readCallUp(match.id)).roster).toEqual([])
+  })
+})
+
+async function withConfirmedCallUp() {
+  const fixture = await withCallUp()
+  expect(await fixture.management.saveCallUp(fixture.match, fixture.selection)).toEqual({ ok: true })
+  const match = (await fixture.repository.read()).matches[0]!
+  const { roster } = await fixture.repository.readCallUp(match.id)
+  const regulars = roster.filter((player) => !player.designatedLibero)
+  const input: LineupInput = {
+    starters: POSITIONS.map((position, index) => ({ position, playerId: regulars[index]!.id })),
+    initialService: 'own',
+  }
+  return { ...fixture, draft: fixture.match, match, input, roster }
+}
+
+describe('confirmación del primer set', () => {
+  it('persiste el primer set pendiente, su servicio y reglas, y cierra la convocatoria', async () => {
+    const { db, match, input, selection, repository, management } = await withConfirmedCallUp()
+    expect(await management.saveInitialLineup(match, input)).toEqual({ ok: true })
+    const confirmed = (await repository.read()).matches[0]!
+    const { firstSet } = await repository.readCallUp(match.id)
+    expect(confirmed).toMatchObject({ phase: 'LISTO_PARA_SAQUE', version: 3 })
+    expect(firstSet).toMatchObject({
+      matchId: match.id, number: 1, status: 'pending', initialService: 'own', finalScore: null,
+      initialOrder: Object.fromEntries(input.starters.map(({ position, playerId }) => [position, playerId])),
+      rulesSnapshot: match.rulesSnapshot,
+    })
+    expect(await management.saveCallUp(confirmed, selection)).toMatchObject({ ok: false, message: expect.stringContaining('no permite editar') })
+    db.close()
+    expect((await workspace(db.name).repository.readCallUp(match.id)).firstSet).toEqual(firstSet)
+  })
+
+  it('rechaza la confirmación desde un borrador o con titulares inválidos y conserva el estado', async () => {
+    const { db, draft, match, input, roster, repository, management } = await withConfirmedCallUp()
+    await db.matches.put(draft)
+    expect((await management.saveInitialLineup(draft, input)).ok).toBe(false)
+    await db.matches.put(match)
+    const playerId = roster.find((player) => player.designatedLibero)!.id
+    const invalid = { ...input, starters: [{ position: 1, playerId }, ...input.starters.slice(1)] }
+    expect(await management.saveInitialLineup(match, invalid)).toMatchObject({ ok: false, message: expect.stringContaining('líberos designados') })
+    expect((await repository.read()).matches[0]).toEqual(match)
+    expect(await db.matchSets.count()).toBe(0)
+  })
+
+  it('serializa confirmaciones simultáneas y corrige el mismo set mientras sigue pendiente', async () => {
+    const { db, match, input, repository, management } = await withConfirmedCallUp()
+    const { management: other } = workspace(db.name)
+    const outcomes = await Promise.all([
+      management.saveInitialLineup(match, input),
+      other.saveInitialLineup(match, { ...input, initialService: 'opponent' }),
+    ])
+    expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(1)
+    expect(outcomes.find((outcome) => !outcome.ok)).toMatchObject({ message: expect.stringContaining('otra edición') })
+    const saved = (await repository.read()).matches[0]!
+    const original = (await repository.readCallUp(match.id)).firstSet!
+    const side = original.initialService === 'own' ? 'opponent' : 'own'
+    expect(await management.saveInitialLineup(saved, { ...input, initialService: side })).toEqual({ ok: true })
+    expect(await db.matchSets.count()).toBe(1)
+    expect((await repository.readCallUp(match.id)).firstSet).toMatchObject({ id: original.id, initialService: side })
+  })
+
+  it('revierte la escritura si falla el cambio de fase y protege un set ya iniciado', async () => {
+    const { db, match, input, repository, management } = await withConfirmedCallUp()
+    vi.spyOn(db.matches, 'put').mockRejectedValueOnce(new Error('Cuota agotada'))
+    expect((await management.saveInitialLineup(match, input)).ok).toBe(false)
+    expect(await db.matchSets.count()).toBe(0)
+    expect((await repository.read()).matches[0]).toEqual(match)
+    expect((await management.saveInitialLineup(match, input)).ok).toBe(true)
+    const firstSet = (await repository.readCallUp(match.id)).firstSet!
+    await db.matchSets.update(firstSet.id, { status: 'active' })
+    const current = (await repository.read()).matches[0]!
+    expect((await management.saveInitialLineup(current, { ...input, initialService: 'opponent' })).ok).toBe(false)
+    expect((await repository.readCallUp(match.id)).firstSet).toMatchObject({ status: 'active', initialService: 'own' })
   })
 })
