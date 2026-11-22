@@ -5,3 +5,5 @@ export type Score = Readonly<{ own: number; opponent: number }>
 export type Positions<T> = Readonly<Record<Position, T>>
 export type IsoDate = string
 export type IsoTimestamp = string
+/** Fecha y hora de la sede, sin conversión de zona horaria: YYYY-MM-DDTHH:mm. */
+export type IsoLocalDateTime = string

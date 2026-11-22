@@ -1,0 +1,203 @@
+import Dexie from 'dexie'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createMatchManagement } from '../../application/matches/service'
+import { createClubManagement } from '../../application/club/service'
+import { createCompetitionManagement } from '../../application/competitions/service'
+import { DEFAULT_RULES_INPUT, rulesToInput } from '../../domain/rules/configuration'
+import type { Match } from '../../domain/match/contracts'
+import { DexieClubRepository } from './club-repository'
+import { DexieCompetitionRepository } from './competition-repository'
+import { DexieMatchRepository } from './match-repository'
+import { IrukaDatabase } from './database'
+
+const databases: IrukaDatabase[] = []
+let sequence = 0
+function workspace(name = `iruka-matches-${++sequence}`) {
+  const db = new IrukaDatabase(name)
+  databases.push(db)
+  const repository = new DexieMatchRepository(db)
+  const management = createMatchManagement(repository, () => `match-${++sequence}`)
+  const clubManagement = createClubManagement(new DexieClubRepository(db), () => `club-data-${++sequence}`)
+  const competitions = createCompetitionManagement(new DexieCompetitionRepository(db), () => `competition-${++sequence}`)
+  return { db, repository, management, clubManagement, competitions }
+}
+const teamInput = { name: 'Iruka Sub 16', branch: 'femenino', category: 'sub16' }
+async function configured() {
+  const result = workspace()
+  await result.clubManagement.saveClub('Club de prueba', null)
+  const club = (await result.repository.read()).club!
+  await result.clubManagement.saveSeason({ name: '2026', start: '2026-01-01', end: '2026-12-31' }, null)
+  const season = (await result.repository.read()).seasons[0]!
+  await result.clubManagement.saveTeam(teamInput, club, [season.id], null)
+  await result.clubManagement.saveTeam({ ...teamInput, name: 'Iruka Sub 14', category: 'sub14' }, club, [season.id], null)
+  let directory = await result.repository.read()
+  const team = directory.teams.find((item) => item.category === 'sub16')!
+  const link = directory.teamSeasons.find((item) => item.teamId === team.id)!
+  const competitionInput = { name: 'Copa Sur', kind: 'Copa', seasonId: season.id, notes: '', teamSeasonIds: directory.teamSeasons.map((item) => item.id) }
+  await result.competitions.save(competitionInput, null)
+  await result.competitions.save({ ...competitionInput, name: 'Liga Regional' }, null)
+  directory = await result.repository.read()
+  const competition = directory.competitions.find((item) => item.name === 'Copa Sur')!
+  const entry = directory.entries.find((item) => item.competitionId === competition.id && item.teamSeasonId === link.id)!
+  const otherEntry = directory.entries.find((item) => item.competitionId !== competition.id && item.teamSeasonId === link.id)!
+  const input = { competitionEntryId: entry.id, opponentName: 'Club Costa', scheduledAt: '2026-11-21T19:30', venue: 'Gimnasio Norte', location: 'local', stage: 'Jornada 1' }
+  return { ...result, club, season, team, link, competition, entry, otherEntry, input, competitionInput }
+}
+function editInput(match: Match) {
+  return { competitionEntryId: match.competitionEntryId, opponentName: match.opponentName, scheduledAt: match.scheduledAt, venue: match.venue, location: match.location, stage: match.stage }
+}
+afterEach(async () => {
+  vi.restoreAllMocks()
+  const names = new Set(databases.map((db) => db.name))
+  for (const db of databases.splice(0)) db.close()
+  for (const name of names) await Dexie.delete(name)
+})
+
+describe('partidos asociados a torneos', () => {
+  it('migra desde v5 conservando todas las tablas anteriores, sin partidos de demostración', async () => {
+    const old = new Dexie('iruka-matches-upgrade')
+    old.version(5).stores({
+      appMetadata: '&key', clubs: '&id', teams: '&id, clubId, &[clubId+branch+category+nameKey]',
+      seasons: '&id, &nameKey', teamSeasons: '&id, &[teamId+seasonId], teamId, seasonId', athletes: '&id, searchKey',
+      memberships: '&id, athleteId, teamSeasonId, &[teamSeasonId+athleteId], &[teamSeasonId+activeJerseyNumber]',
+      competitions: '&id, seasonId, &[seasonId+nameKey]', competitionEntries: '&id, competitionId, teamSeasonId, &[competitionId+teamSeasonId]',
+    })
+    const records = {
+      clubs: { id: 'local-club', name: 'Club existente', revision: 1 },
+      teams: { id: 't', clubId: 'local-club', name: 'Sub 16', branch: 'femenino', category: 'sub16', active: true, revision: 1, nameKey: 'sub 16' },
+      seasons: { id: 's', name: '2026', start: '2026-01-01', end: '2026-12-31', active: true, revision: 1, nameKey: '2026' },
+      teamSeasons: { id: 'ts', teamId: 't', seasonId: 's', active: true },
+      athletes: { id: 'a', name: 'Persona existente', active: true, revision: 1, searchKey: 'persona existente' },
+      memberships: { id: 'm', athleteId: 'a', teamSeasonId: 'ts', jerseyNumber: 5, activeJerseyNumber: 5, usualRole: 'punta', active: true, revision: 1 },
+      competitions: { id: 'c', name: 'Copa Sur', nameKey: 'copa sur', kind: 'Copa', seasonId: 's', active: true, revision: 1 },
+      competitionEntries: { id: 'e', competitionId: 'c', teamSeasonId: 'ts', active: true },
+    }
+    for (const [table, record] of Object.entries(records)) await old.table(table).add(record)
+    await old.table('appMetadata').bulkPut([{ key: 'schemaVersion', value: '5' }, { key: 'keep', value: 'conservar' }])
+    old.close()
+    const { db, repository } = workspace('iruka-matches-upgrade')
+    expect((await repository.read()).matches).toEqual([])
+    for (const [table, record] of Object.entries(records)) expect(await db.table(table).toArray()).toEqual([record])
+    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '6' })
+    expect(await db.appMetadata.get('keep')).toEqual({ key: 'keep', value: 'conservar' })
+  })
+
+  it('crea un borrador vinculado al equipo y torneo, lo recupera y no crea personas rivales', async () => {
+    const result = await configured()
+    expect(await result.management.save(result.input, DEFAULT_RULES_INPUT, null)).toEqual({ ok: true })
+    const directory = await result.repository.read()
+    expect(directory.matches).toHaveLength(1)
+    expect(directory.matches[0]).toMatchObject({ ...result.input, phase: 'BORRADOR', active: true, version: 1 })
+    expect(await result.db.athletes.count()).toBe(0)
+    result.db.close()
+    expect((await workspace(result.db.name).repository.read()).matches).toEqual(directory.matches)
+  })
+
+  it('conserva reglas independientes por partido y permite repetir rival y horario', async () => {
+    const result = await configured()
+    const rules = { ...DEFAULT_RULES_INPUT, substitutionLimit: '8', minimumLiberos: '1', twoLiberosAbove: '12' }
+    await result.management.save(result.input, rules, null)
+    rules.substitutionLimit = '0'
+    await result.management.save(result.input, rules, null)
+    const matches = (await result.repository.read()).matches
+    expect(matches).toHaveLength(2)
+    expect(matches.map((match) => match.rulesSnapshot.officialSubstitutions.limitPerSet).sort()).toEqual([0, 8])
+    expect(new Set(matches.map((match) => match.id)).size).toBe(2)
+  })
+
+  it('edita fecha, sede y reglas del borrador con el mismo ID sin afectar otro partido', async () => {
+    const result = await configured()
+    await result.management.save(result.input, DEFAULT_RULES_INPUT, null)
+    await result.management.save({ ...result.input, opponentName: 'Otro rival' }, DEFAULT_RULES_INPUT, null)
+    const original = (await result.repository.read()).matches.find((match) => match.opponentName === 'Club Costa')!
+    const other = (await result.repository.read()).matches.find((match) => match.id !== original.id)!
+    expect((await result.management.save({ ...editInput(original), scheduledAt: '2026-12-01T18:00', venue: 'Cancha B' }, { ...DEFAULT_RULES_INPUT, substitutionLimit: '8' }, original)).ok).toBe(true)
+    const matches = (await result.repository.read()).matches
+    expect(matches.find((match) => match.id === original.id)).toMatchObject({ id: original.id, version: 2, scheduledAt: '2026-12-01T18:00', venue: 'Cancha B', rulesSnapshot: { officialSubstitutions: { limitPerSet: 8 } } })
+    expect(matches.find((match) => match.id === other.id)).toEqual(other)
+  })
+
+  it('no permite trasladar un partido a otro equipo o torneo', async () => {
+    const result = await configured()
+    await result.management.save(result.input, DEFAULT_RULES_INPUT, null)
+    const original = (await result.repository.read()).matches[0]!
+    expect((await result.management.save({ ...result.input, competitionEntryId: result.otherEntry.id }, DEFAULT_RULES_INPUT, original)).ok).toBe(false)
+    await expect(result.repository.save({ ...original, competitionEntryId: result.otherEntry.id, version: 2 }, 1)).rejects.toMatchObject({ code: 'immutable_entry' })
+    expect((await result.repository.read()).matches[0]).toEqual(original)
+  })
+
+  it.each(['competition', 'team', 'season', 'teamSeason', 'entry'] as const)('bloquea altas y ediciones con %s inactivo, permite archivar y exige referencias activas al restaurar', async (reference) => {
+    const result = await configured()
+    await result.management.save(result.input, DEFAULT_RULES_INPUT, null)
+    const original = (await result.repository.read()).matches[0]!
+    if (reference === 'competition') await result.competitions.setActive(result.competition, false)
+    if (reference === 'team') await result.clubManagement.setTeamActive(result.team, false)
+    if (reference === 'season') await result.clubManagement.setSeasonActive(result.season, false)
+    if (reference === 'teamSeason') await result.clubManagement.saveTeam(teamInput, result.club, [], result.team)
+    if (reference === 'entry') await result.competitions.save({ ...result.competitionInput, teamSeasonIds: result.competitionInput.teamSeasonIds.filter((id) => id !== result.link.id) }, result.competition)
+    expect((await result.repository.read()).matches[0]).toEqual(original)
+    expect((await result.management.save(result.input, DEFAULT_RULES_INPUT, null)).ok).toBe(false)
+    expect((await result.management.save(result.input, DEFAULT_RULES_INPUT, original)).ok).toBe(false)
+    expect((await result.management.setActive(original, false)).ok).toBe(true)
+    const archived = (await result.repository.read()).matches[0]!
+    expect((await result.management.setActive(archived, true)).ok).toBe(false)
+    expect(archived).toMatchObject({ id: original.id, active: false, rulesSnapshot: original.rulesSnapshot })
+  })
+
+  it('restaura el borrador con sus reglas y misma identidad', async () => {
+    const result = await configured()
+    await result.management.save(result.input, DEFAULT_RULES_INPUT, null)
+    const original = (await result.repository.read()).matches[0]!
+    await result.management.setActive(original, false)
+    const archived = (await result.repository.read()).matches[0]!
+    expect((await result.management.save(result.input, DEFAULT_RULES_INPUT, archived)).ok).toBe(false)
+    expect((await result.management.setActive(archived, true)).ok).toBe(true)
+    expect((await result.repository.read()).matches[0]).toEqual({ ...original, version: 3 })
+  })
+
+  it('serializa dos ediciones concurrentes y no deja que el archivo antiguo sobrescriba el partido', async () => {
+    const result = await configured()
+    await result.management.save(result.input, DEFAULT_RULES_INPUT, null)
+    const original = (await result.repository.read()).matches[0]!
+    const second = workspace(result.db.name)
+    const outcomes = await Promise.all([
+      result.management.save({ ...result.input, venue: 'Cancha A' }, DEFAULT_RULES_INPUT, original),
+      second.management.save({ ...result.input, venue: 'Cancha B' }, DEFAULT_RULES_INPUT, original),
+    ])
+    expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(1)
+    expect(outcomes.find((outcome) => !outcome.ok)).toMatchObject({ message: expect.stringContaining('otra edición') })
+    expect((await second.management.setActive(original, false)).ok).toBe(false)
+    expect((await result.repository.read()).matches[0]).toMatchObject({ id: original.id, active: true, version: 2 })
+  })
+
+  it('rechaza participaciones ausentes o inconsistentes, sin crear registros huérfanos', async () => {
+    const result = await configured()
+    expect((await result.management.save({ ...result.input, competitionEntryId: 'missing' }, DEFAULT_RULES_INPUT, null)).ok).toBe(false)
+    await result.db.teamSeasons.update(result.link.id, { seasonId: 'different-season' as typeof result.season.id })
+    expect((await result.management.save(result.input, DEFAULT_RULES_INPUT, null)).ok).toBe(false)
+    expect((await result.repository.read()).matches).toHaveLength(0)
+  })
+
+  it('no modifica ni archiva encuentros que ya salieron de borrador', async () => {
+    const result = await configured()
+    await result.management.save(result.input, DEFAULT_RULES_INPUT, null)
+    const original = (await result.repository.read()).matches[0]!
+    await result.db.matches.update(original.id, { phase: 'CONVOCATORIA' })
+    const current = (await result.repository.read()).matches[0]!
+    expect((await result.management.save(editInput(current), rulesToInput(current.rulesSnapshot), current)).ok).toBe(false)
+    expect((await result.management.save(editInput(original), DEFAULT_RULES_INPUT, original)).ok).toBe(false)
+    expect((await result.management.setActive(current, false)).ok).toBe(false)
+    expect((await result.repository.read()).matches[0]).toEqual(current)
+  })
+
+  it('conserva reglas y estado confirmado si hay datos inválidos o falla el almacenamiento', async () => {
+    const result = await configured()
+    expect((await result.management.save({ ...result.input, scheduledAt: '2026-02-30T12:00' }, DEFAULT_RULES_INPUT, null)).ok).toBe(false)
+    expect((await result.management.save(result.input, { ...DEFAULT_RULES_INPUT, substitutionLimit: '-1' }, null)).ok).toBe(false)
+    await result.management.save(result.input, DEFAULT_RULES_INPUT, null)
+    const original = (await result.repository.read()).matches[0]!
+    vi.spyOn(result.db.matches, 'put').mockRejectedValueOnce(new Error('Cuota agotada'))
+    expect(await result.management.save({ ...result.input, venue: 'No guardar' }, DEFAULT_RULES_INPUT, original)).toMatchObject({ ok: false, message: expect.stringContaining('No se pudo guardar') })
+    expect((await result.repository.read()).matches[0]).toEqual(original)
+  })
+})

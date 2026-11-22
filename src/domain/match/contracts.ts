@@ -1,6 +1,6 @@
 import type { Athlete, CompetitionEntry, RosterMembership } from '../club/contracts'
 import type { RulesSnapshot } from '../rules/contracts'
-import type { Id, IsoTimestamp, Position, Positions, Score, Side } from '../shared/types'
+import type { Id, IsoLocalDateTime, Position, Positions, Score, Side } from '../shared/types'
 
 export type MatchPhase = 'BORRADOR' | 'CONVOCATORIA' | 'ALINEACION_SET' | 'LISTO_PARA_SAQUE'
   | 'JUGADA_EN_CURSO' | 'ENTRE_JUGADAS' | 'FIN_SET' | 'FIN_PARTIDO'
@@ -9,13 +9,14 @@ export interface Match {
   readonly id: Id<'Match'>
   readonly competitionEntryId: CompetitionEntry['id']
   readonly opponentName: string
-  readonly scheduledAt: IsoTimestamp
+  readonly scheduledAt: IsoLocalDateTime
   readonly venue: string
   readonly location: 'local' | 'visita' | 'neutral'
   readonly stage: string
   readonly rulesSnapshot: RulesSnapshot
   readonly phase: MatchPhase
   readonly version: number
+  readonly active: boolean
 }
 export interface MatchRoster {
   readonly id: Id<'MatchRoster'>

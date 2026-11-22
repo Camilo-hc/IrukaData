@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import type { StorageHealthPort, StorageStatus } from '../../application/ports'
 import type { Athlete, Club, Competition, CompetitionEntry, RosterMembership, Season, Team, TeamSeason } from '../../domain/club/contracts'
+import type { Match } from '../../domain/match/contracts'
 
 export interface AppMetadata { key: string; value: string }
 
@@ -20,6 +21,7 @@ export class IrukaDatabase extends Dexie {
   memberships!: Table<StoredMembership, RosterMembership['id']>
   competitions!: Table<StoredCompetition, Competition['id']>
   competitionEntries!: Table<CompetitionEntry, CompetitionEntry['id']>
+  matches!: Table<Match, Match['id']>
 
   constructor(name = 'irukadata') {
     super(name)
@@ -45,6 +47,9 @@ export class IrukaDatabase extends Dexie {
       competitionEntries: '&id, competitionId, teamSeasonId, &[competitionId+teamSeasonId]',
     }).upgrade(async (transaction) => {
       await transaction.table('appMetadata').put({ key: 'schemaVersion', value: '5' })
+    })
+    this.version(6).stores({ matches: '&id, competitionEntryId, scheduledAt' }).upgrade(async (transaction) => {
+      await transaction.table('appMetadata').put({ key: 'schemaVersion', value: '6' })
     })
   }
 }
