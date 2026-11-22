@@ -3,8 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMatchManagement } from '../../application/matches/service'
 import { createClubManagement } from '../../application/club/service'
 import { createCompetitionManagement } from '../../application/competitions/service'
-import { DEFAULT_RULES_INPUT, rulesToInput } from '../../domain/rules/configuration'
+import { DEFAULT_RULES_INPUT, rulesToInput, validateRules } from '../../domain/rules/configuration'
 import type { Match } from '../../domain/match/contracts'
+import type { CallUpSelection } from '../../domain/match/call-up'
+import type { Id } from '../../domain/shared/types'
 import { DexieClubRepository } from './club-repository'
 import { DexieCompetitionRepository } from './competition-repository'
 import { DexieMatchRepository } from './match-repository'
@@ -54,14 +56,17 @@ afterEach(async () => {
 })
 
 describe('partidos asociados a torneos', () => {
-  it('migra desde v5 conservando todas las tablas anteriores, sin partidos de demostración', async () => {
+  it('migra desde v6 conservando partidos, reglas y todas las tablas anteriores', async () => {
     const old = new Dexie('iruka-matches-upgrade')
-    old.version(5).stores({
+    old.version(6).stores({
       appMetadata: '&key', clubs: '&id', teams: '&id, clubId, &[clubId+branch+category+nameKey]',
       seasons: '&id, &nameKey', teamSeasons: '&id, &[teamId+seasonId], teamId, seasonId', athletes: '&id, searchKey',
       memberships: '&id, athleteId, teamSeasonId, &[teamSeasonId+athleteId], &[teamSeasonId+activeJerseyNumber]',
       competitions: '&id, seasonId, &[seasonId+nameKey]', competitionEntries: '&id, competitionId, teamSeasonId, &[competitionId+teamSeasonId]',
+      matches: '&id, competitionEntryId, scheduledAt',
     })
+    const rules = validateRules(DEFAULT_RULES_INPUT)
+    if (!rules.ok) throw new Error('El perfil de prueba debe ser válido.')
     const records = {
       clubs: { id: 'local-club', name: 'Club existente', revision: 1 },
       teams: { id: 't', clubId: 'local-club', name: 'Sub 16', branch: 'femenino', category: 'sub16', active: true, revision: 1, nameKey: 'sub 16' },
@@ -71,14 +76,20 @@ describe('partidos asociados a torneos', () => {
       memberships: { id: 'm', athleteId: 'a', teamSeasonId: 'ts', jerseyNumber: 5, activeJerseyNumber: 5, usualRole: 'punta', active: true, revision: 1 },
       competitions: { id: 'c', name: 'Copa Sur', nameKey: 'copa sur', kind: 'Copa', seasonId: 's', active: true, revision: 1 },
       competitionEntries: { id: 'e', competitionId: 'c', teamSeasonId: 'ts', active: true },
+      matches: {
+        id: 'm1', competitionEntryId: 'e', opponentName: 'Club Costa', scheduledAt: '2026-11-21T19:30',
+        venue: 'Gimnasio Norte', location: 'local', stage: '', phase: 'BORRADOR', active: true,
+        version: 1, rulesSnapshot: rules.value,
+      },
     }
     for (const [table, record] of Object.entries(records)) await old.table(table).add(record)
-    await old.table('appMetadata').bulkPut([{ key: 'schemaVersion', value: '5' }, { key: 'keep', value: 'conservar' }])
+    await old.table('appMetadata').bulkPut([{ key: 'schemaVersion', value: '6' }, { key: 'keep', value: 'conservar' }])
     old.close()
     const { db, repository } = workspace('iruka-matches-upgrade')
-    expect((await repository.read()).matches).toEqual([])
+    expect((await repository.read()).matches).toEqual([records.matches])
+    expect(await db.matchRosters.count()).toBe(0)
     for (const [table, record] of Object.entries(records)) expect(await db.table(table).toArray()).toEqual([record])
-    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '6' })
+    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '7' })
     expect(await db.appMetadata.get('keep')).toEqual({ key: 'keep', value: 'conservar' })
   })
 
@@ -199,5 +210,86 @@ describe('partidos asociados a torneos', () => {
     vi.spyOn(result.db.matches, 'put').mockRejectedValueOnce(new Error('Cuota agotada'))
     expect(await result.management.save({ ...result.input, venue: 'No guardar' }, DEFAULT_RULES_INPUT, original)).toMatchObject({ ok: false, message: expect.stringContaining('No se pudo guardar') })
     expect((await result.repository.read()).matches[0]).toEqual(original)
+  })
+})
+
+async function withCallUp() {
+  const result = await configured()
+  await result.management.save(result.input, { ...DEFAULT_RULES_INPUT, minimumLiberos: '1' }, null)
+  const match = (await result.repository.read()).matches[0]!
+  const otherTeam = (await result.repository.read()).teamSeasons.find((link) => link.id !== result.link.id)!
+  for (let number = 1; number <= 10; number++) {
+    const athleteId = `athlete-${number}` as Id<'Athlete'>
+    await result.db.athletes.add({ id: athleteId, name: `Deportista ${number}`, active: number !== 9, revision: 1, searchKey: `deportista ${number}` })
+    await result.db.memberships.add({
+      id: `membership-${number}` as Id<'RosterMembership'>,
+      athleteId,
+      teamSeasonId: number === 10 ? otherTeam.id : result.link.id,
+      jerseyNumber: number,
+      ...(number === 8 ? {} : { activeJerseyNumber: number }),
+      active: number !== 8,
+      usualRole: number === 1 ? 'libero' : 'sin_definir',
+      revision: 1,
+    })
+  }
+  const selection: CallUpSelection[] = (await result.repository.readCallUp(match.id)).candidates
+    .map((candidate) => ({ ...candidate, libero: candidate.jerseyNumber === 7 }))
+  return { ...result, match, selection }
+}
+
+describe('convocatoria por plantilla', () => {
+  it('filtra perfiles y vínculos inactivos y excluye deportistas de otra plantilla', async () => {
+    const { repository, management, match, selection } = await withCallUp()
+    expect(selection.map((player) => player.jerseyNumber)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    for (const number of [8, 9, 10]) {
+      const outsider = { membershipId: `membership-${number}` as Id<'RosterMembership'>, name: `Deportista ${number}`, jerseyNumber: number, libero: false }
+      expect(await management.saveCallUp(match, [...selection, outsider])).toMatchObject({ ok: false })
+    }
+    expect((await repository.readCallUp(match.id)).roster).toEqual([])
+  })
+
+  it('guarda plantel, fase y designaciones, con fotos de nombre y dorsal independientes de la plantilla', async () => {
+    const { db, repository, management, match, selection } = await withCallUp()
+    expect(await management.saveCallUp(match, selection)).toEqual({ ok: true })
+    const saved = (await repository.read()).matches[0]!
+    const original = (await repository.readCallUp(match.id)).roster
+    expect(saved).toMatchObject({ phase: 'CONVOCATORIA', version: 2 })
+    expect(original).toHaveLength(7)
+    expect(original.filter((player) => player.designatedLibero).map((player) => player.jerseyNumberSnapshot)).toEqual([7])
+    await db.athletes.update('athlete-1' as Id<'Athlete'>, { name: 'Nombre corregido' })
+    await db.memberships.update('membership-1' as Id<'RosterMembership'>, { jerseyNumber: 18, activeJerseyNumber: 18 })
+    expect(await management.saveCallUp(saved, selection)).toEqual({ ok: true })
+    db.close()
+    expect((await workspace(db.name).repository.readCallUp(match.id)).roster).toEqual(original)
+  })
+
+  it('rechaza un candidato que cambió durante la selección y una versión desactualizada del partido', async () => {
+    const { db, repository, management, match, selection } = await withCallUp()
+    await db.memberships.update('membership-1' as Id<'RosterMembership'>, { jerseyNumber: 18, activeJerseyNumber: 18 })
+    expect(await management.saveCallUp(match, selection)).toMatchObject({ ok: false, message: expect.stringContaining('Cambió un perfil o una inscripción') })
+    const updated = selection.map((player) => player.jerseyNumber === 1 ? { ...player, jerseyNumber: 18 } : player)
+    const other = workspace(db.name)
+    const outcomes = await Promise.all([management.saveCallUp(match, updated), other.management.saveCallUp(match, updated)])
+    expect(outcomes).toContainEqual({ ok: true })
+    expect(outcomes).toContainEqual({ ok: false, message: expect.stringContaining('otra edición') })
+    expect((await repository.readCallUp(match.id)).roster).toHaveLength(7)
+    expect((await repository.read()).matches[0]?.version).toBe(2)
+  })
+
+  it('revierte las filas de la convocatoria si falla la actualización de fase', async () => {
+    const { db, repository, management, match, selection } = await withCallUp()
+    vi.spyOn(db.matches, 'put').mockRejectedValueOnce(new Error('Cuota agotada'))
+    expect(await management.saveCallUp(match, selection)).toMatchObject({ ok: false })
+    expect(await db.matchRosters.count()).toBe(0)
+    expect((await repository.read()).matches[0]).toEqual(match)
+  })
+
+  it('bloquea cambios cuando la alineación ya comenzó o cuando el torneo se archiva', async () => {
+    const { db, repository, management, competitions, competition, match, selection } = await withCallUp()
+    await competitions.setActive(competition, false)
+    expect(await management.saveCallUp(match, selection)).toMatchObject({ ok: false, message: expect.stringContaining('torneo') })
+    await db.matches.update(match.id, { phase: 'ALINEACION_SET' })
+    expect(await management.saveCallUp(match, selection)).toMatchObject({ ok: false, message: expect.stringContaining('no permite editar la convocatoria') })
+    expect((await repository.readCallUp(match.id)).roster).toEqual([])
   })
 })

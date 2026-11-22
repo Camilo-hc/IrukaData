@@ -159,3 +159,76 @@ test('explica los requisitos para crear partidos y permite volver desde rutas in
   await page.goto('/#/torneos/inexistente/partidos')
   await expect(page.getByRole('heading', { name: 'Torneo no encontrado', exact: true })).toBeVisible()
 })
+
+test('convoca desde la plantilla del partido y conserva nombres y dorsales offline', async ({ page, context }) => {
+  await setup(page)
+  const form = await startMatch(page)
+  await form.getByLabel('Mínimo de líberos designados', { exact: true }).selectOption('1')
+  await form.getByRole('button', { name: 'Guardar partido', exact: true }).click()
+  await page.getByRole('link', { name: 'vs. Club Costa', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Convocatoria', exact: true })).toBeVisible()
+
+  // Fixture masiva en el IndexedDB aislado de Playwright. El partido se creó desde la interfaz.
+  await page.evaluate(async () => {
+    function result<T>(request: IDBRequest<T>): Promise<T> {
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+    }
+    const db = await result(indexedDB.open('irukadata'))
+    try {
+      const lookup = db.transaction(['teams', 'teamSeasons'], 'readonly')
+      const [teams, links] = await Promise.all([
+        result(lookup.objectStore('teams').getAll()),
+        result(lookup.objectStore('teamSeasons').getAll()),
+      ])
+      const team16 = links.find((link) => teams.some((team) => team.id === link.teamId && team.category === 'sub16'))
+      const team14 = links.find((link) => teams.some((team) => team.id === link.teamId && team.category === 'sub14'))
+      if (!team16 || !team14) throw new Error('No se encontraron las plantillas de prueba.')
+      const transaction = db.transaction(['athletes', 'memberships'], 'readwrite')
+      await new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve()
+        transaction.onabort = () => reject(transaction.error)
+        for (let number = 1; number <= 9; number++) {
+          const name = `Deportista ${number}`
+          const athleteId = `convocatoria-athlete-${number}`
+          const active = number !== 8
+          transaction.objectStore('athletes').add({ id: athleteId, name, active: true, revision: 1, searchKey: name.toLowerCase() })
+          transaction.objectStore('memberships').add({
+            id: `convocatoria-membership-${number}`, athleteId, active, revision: 1,
+            teamSeasonId: number === 9 ? team14.id : team16.id, jerseyNumber: number,
+            ...(active ? { activeJerseyNumber: number } : {}), usualRole: number === 1 ? 'libero' : 'sin_definir',
+          })
+        }
+      })
+    } finally { db.close() }
+    await navigator.serviceWorker.ready
+  })
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
+  await context.setOffline(true)
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.reload()
+  await page.getByRole('button', { name: 'Preparar convocatoria', exact: true }).click()
+  const editor = page.getByRole('form', { name: 'Editar convocatoria del partido' })
+  await expect(editor.getByRole('button', { name: /Deportista [1-7]$/ })).toHaveCount(7)
+  await expect(editor.getByRole('button', { name: /Deportista [89]$/ })).toHaveCount(0)
+  for (let number = 1; number <= 7; number++) {
+    await editor.getByRole('button', { name: new RegExp(`Deportista ${number}$`) }).click()
+  }
+  const save = editor.getByRole('button', { name: 'Guardar convocatoria', exact: true })
+  await save.click()
+  await expect(editor.getByRole('alert')).toContainText('al menos un líbero')
+  await editor.getByRole('checkbox', { name: 'Designar líbero a Deportista 7 #7' }).check()
+  await expect(editor.getByRole('checkbox', { name: 'Designar líbero a Deportista 1 #1' })).not.toBeChecked()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await save.click()
+  const roster = page.getByRole('list', { name: 'Deportistas convocados' })
+  await expect(roster.getByRole('listitem')).toHaveCount(7)
+  await expect(roster.getByRole('listitem').filter({ hasText: 'Deportista 7' })).toContainText('Líbero')
+  await page.reload()
+  await expect(roster.getByRole('listitem')).toHaveCount(7)
+  await expect(roster.getByRole('listitem').filter({ hasText: 'Deportista 1' })).toContainText('#1')
+  await page.getByRole('button', { name: 'Editar convocatoria', exact: true }).click()
+  await expect(editor.getByRole('checkbox', { name: 'Designar líbero a Deportista 7 #7' })).toBeChecked()
+})

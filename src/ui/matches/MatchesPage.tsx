@@ -6,6 +6,7 @@ import { participationIsActive, resolveMatchContext } from '../../domain/match/c
 import { MATCH_LOCATIONS } from '../../domain/match/validation'
 import { nameKey } from '../../domain/shared/validation'
 import { MatchForm } from './MatchForm'
+import { CallUpPanel } from './CallUpPanel'
 import { formatMatchDate, MATCH_PHASES, participationLabel } from './labels'
 import { RulesSummary } from './RulesFields'
 import { useMatchDirectory } from './useMatchDirectory'
@@ -56,6 +57,13 @@ function MatchWorkspace({ management, competitionId, matchId }: { management: Ma
     {selected ? <>
       {!participationIsActive(selectedContext) && <p className="notice">El torneo, equipo, temporada o su asociación están inactivos. Los datos se conservan; reactiva las referencias para editar o restaurar este partido.</p>}
       <article className="athlete-profile"><dl className="profile-fields"><div><dt>Fecha y hora de la sede</dt><dd>{formatMatchDate(selected.scheduledAt)}</dd></div><div><dt>Sede</dt><dd>{selected.venue}</dd></div><div><dt>Condición</dt><dd>{MATCH_LOCATIONS[selected.location]}</dd></div><div><dt>Fase o jornada</dt><dd>{selected.stage || 'Sin indicar'}</dd></div></dl>{actions(selected)}<RulesSummary rules={selected.rulesSnapshot} /></article>
+      <CallUpPanel
+        key={selected.id}
+        match={selected}
+        teamSeasonId={selectedContext?.teamSeason.id}
+        canEdit={selected.active && !editor && !mutation.busy && participationIsActive(selectedContext)}
+        management={management}
+      />
     </> : <>
       <div className="catalog-toolbar"><button className="button" disabled={Boolean(editor) || mutation.busy || !canCreate} onClick={() => open(null)}>Nuevo partido</button><Link className="text-link" to="/torneos">Ver torneos</Link><label className="checkbox-label"><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />Ver solo partidos archivados</label></div>
       {!canCreate && <p className="notice">Para crear partidos necesitas un torneo y una participación activos, con equipo y temporada activos.</p>}
@@ -70,6 +78,5 @@ function MatchWorkspace({ management, competitionId, matchId }: { management: Ma
         return <article className="match-card" key={match.id}><span className="tag subtle">{MATCH_PHASES[match.phase]}</span><h2><Link className="text-link" to={`/partidos/${match.id}`}>vs. {match.opponentName}</Link></h2><p>{context ? participationLabel(context) : 'Participación no disponible'}</p><p><time dateTime={match.scheduledAt}>{formatMatchDate(match.scheduledAt)}</time><br />{match.venue} · {MATCH_LOCATIONS[match.location]}{match.stage && ` · ${match.stage}`}</p>{!participationIsActive(context) && <p className="record-status">Torneo o participación inactivos</p>}{actions(match)}</article>
       })}</div> : <div className="empty-state">No hay partidos para esta vista. {showArchived ? 'Los borradores archivados aparecerán aquí.' : 'Crea un partido o ajusta los filtros.'}</div>}
     </>}
-    <p className="catalog-help match-scope">Los encuentros se guardan en borrador. La convocatoria, las alineaciones y la anotación en vivo se incorporarán en próximas entregas.</p>
   </section>
 }

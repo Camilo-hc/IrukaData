@@ -69,7 +69,7 @@ describe('torneos y equipos participantes', () => {
     const { db, repository } = workspace('iruka-competitions-upgrade')
     expect(await repository.read()).toMatchObject({ competitions: [], entries: [] })
     for (const [table, record] of Object.entries(records)) expect(await db.table(table).toArray()).toEqual([record])
-    expect(await db.appMetadata.toArray()).toEqual(expect.arrayContaining([{ key: 'schemaVersion', value: '6' }, { key: 'keep', value: 'conservar' }]))
+    expect(await db.appMetadata.toArray()).toEqual(expect.arrayContaining([{ key: 'schemaVersion', value: '7' }, { key: 'keep', value: 'conservar' }]))
   })
 
   it('un torneo reúne equipos de la misma temporada y un equipo participa en varios torneos', async () => {
