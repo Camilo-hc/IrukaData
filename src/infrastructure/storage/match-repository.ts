@@ -2,7 +2,8 @@ import { liveQuery } from 'dexie'
 import { MatchError, type CallUpDirectory, type MatchDirectory, type MatchRepository } from '../../application/matches/ports'
 import type { TeamSeason } from '../../domain/club/contracts'
 import { validateCallUp, type CallUpSelection } from '../../domain/match/call-up'
-import type { Match, MatchRoster } from '../../domain/match/contracts'
+import type { Match, MatchRoster, MatchSet } from '../../domain/match/contracts'
+import { validateLineup, type LineupInput } from '../../domain/match/lineup'
 import { participationIsActive, resolveMatchContext } from '../../domain/match/context'
 import { DexieCompetitionRepository } from './competition-repository'
 import type { IrukaDatabase } from './database'
@@ -44,12 +45,15 @@ export class DexieMatchRepository implements MatchRepository {
 
   async readCallUp(matchId: Match['id']): Promise<CallUpDirectory> {
     const db = this.database
-    return db.transaction('r', [db.matches, db.competitionEntries, db.athletes, db.memberships, db.matchRosters], async () => {
+    return db.transaction('r', [db.matches, db.competitionEntries, db.athletes, db.memberships, db.matchRosters, db.matchSets], async () => {
       const match = await db.matches.get(matchId)
       const entry = match && await db.competitionEntries.get(match.competitionEntryId)
-      const roster = await db.matchRosters.where('matchId').equals(matchId).toArray()
-      const candidates = entry ? await this.readCandidates(entry.teamSeasonId) : []
-      return { matchVersion: match?.version, candidates, roster: roster.filter((player) => player.calledUp) }
+      const [roster, candidates, firstSet] = await Promise.all([
+        db.matchRosters.where('matchId').equals(matchId).toArray(),
+        entry ? this.readCandidates(entry.teamSeasonId) : [],
+        db.matchSets.get({ matchId, number: 1 }),
+      ])
+      return { matchVersion: match?.version, candidates, roster: roster.filter((player) => player.calledUp), firstSet }
     })
   }
 
@@ -120,6 +124,41 @@ export class DexieMatchRepository implements MatchRepository {
         ...removed.map((player) => ({ ...player, calledUp: false, designatedLibero: false })),
       ])
       await db.matches.put({ ...match, phase: 'CONVOCATORIA', version: match.version + 1 })
+    })
+  }
+
+  async saveInitialLineup(matchId: Match['id'], expectedVersion: number, input: LineupInput) {
+    const db = this.database
+    await db.transaction('rw', [
+      db.matches, db.matchRosters, db.matchSets, db.competitionEntries,
+      db.competitions, db.teamSeasons, db.teams, db.seasons,
+    ], async () => {
+      const match = await db.matches.get(matchId)
+      if (!match) throw new MatchError('conflict')
+      checkVersion(match, expectedVersion)
+      const firstSet = await db.matchSets.get({ matchId, number: 1 })
+      const preparing = match.phase === 'CONVOCATORIA' || match.phase === 'ALINEACION_SET'
+      const correcting = match.phase === 'LISTO_PARA_SAQUE' && firstSet?.status === 'pending'
+      if (!match.active || (!preparing && !correcting) || (firstSet && firstSet.status !== 'pending')) {
+        throw new MatchError('lineup_locked')
+      }
+
+      await this.requireActiveParticipation(match.competitionEntryId)
+      const roster = await db.matchRosters.where('matchId').equals(matchId).toArray()
+      const lineup = validateLineup(input, roster)
+      if (!lineup.ok) throw new MatchError('invalid_lineup', lineup.message)
+
+      const set: MatchSet = {
+        id: firstSet?.id ?? JSON.stringify([matchId, 1]) as MatchSet['id'],
+        matchId,
+        number: 1,
+        ...lineup.value,
+        rulesSnapshot: match.rulesSnapshot,
+        status: 'pending',
+        finalScore: null,
+      }
+      await db.matchSets.put(set)
+      await db.matches.put({ ...match, phase: 'LISTO_PARA_SAQUE', version: match.version + 1 })
     })
   }
 

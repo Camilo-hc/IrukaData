@@ -33,6 +33,7 @@ const matches: MatchManagement = {
   observeCallUp: () => () => {},
   save: async () => ({ ok: true }),
   saveCallUp: async () => ({ ok: true }),
+  saveInitialLineup: async () => ({ ok: true }),
   setActive: async () => ({ ok: true }),
 }
 

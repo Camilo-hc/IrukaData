@@ -1,5 +1,6 @@
 import type { Match } from '../../domain/match/contracts'
 import type { CallUpSelection } from '../../domain/match/call-up'
+import type { LineupInput } from '../../domain/match/lineup'
 import { validateMatch, type MatchInput } from '../../domain/match/validation'
 import { validateRules, type RulesInput } from '../../domain/rules/configuration'
 import type { Id } from '../../domain/shared/types'
@@ -14,6 +15,8 @@ const messages: Record<MatchErrorCode, string> = {
   call_up_locked: 'Este partido ya no permite editar la convocatoria.',
   invalid_candidate: 'Cambió un perfil o una inscripción de la plantilla. Revisa la selección y vuelve a guardar.',
   invalid_call_up: 'Revisa los deportistas y las designaciones de líbero de la convocatoria.',
+  lineup_locked: 'La alineación inicial solo se puede confirmar con la convocatoria guardada y antes de iniciar el set.',
+  invalid_lineup: 'Revisa la alineación inicial y el equipo al saque.',
   unavailable: 'No se pudo guardar el partido en este dispositivo. Conserva el formulario y vuelve a intentarlo.',
 }
 
@@ -29,6 +32,8 @@ export function createMatchManagement(repository: MatchRepository, newId: () => 
     observeCallUp: repository.observeCallUp.bind(repository),
     saveCallUp: (match: Match, selection: readonly CallUpSelection[]) =>
       persist(() => repository.saveCallUp(match.id, match.version, selection)),
+    saveInitialLineup: (match: Match, input: LineupInput) =>
+      persist(() => repository.saveInitialLineup(match.id, match.version, input)),
     async save(input: MatchInput, rulesInput: RulesInput, current: Match | null): Promise<SaveResult> {
       const details = validateMatch(input)
       const rules = validateRules(rulesInput)

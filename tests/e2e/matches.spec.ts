@@ -160,7 +160,8 @@ test('explica los requisitos para crear partidos y permite volver desde rutas in
   await expect(page.getByRole('heading', { name: 'Torneo no encontrado', exact: true })).toBeVisible()
 })
 
-test('convoca desde la plantilla del partido y conserva nombres y dorsales offline', async ({ page, context }) => {
+test('convoca desde la plantilla y confirma seis titulares y el primer saque offline', async ({ page, context }) => {
+  test.setTimeout(60_000)
   await setup(page)
   const form = await startMatch(page)
   await form.getByLabel('Mínimo de líberos designados', { exact: true }).selectOption('1')
@@ -190,7 +191,7 @@ test('convoca desde la plantilla del partido y conserva nombres y dorsales offli
       await new Promise<void>((resolve, reject) => {
         transaction.oncomplete = () => resolve()
         transaction.onabort = () => reject(transaction.error)
-        for (let number = 1; number <= 9; number++) {
+        for (let number = 1; number <= 10; number++) {
           const name = `Deportista ${number}`
           const athleteId = `convocatoria-athlete-${number}`
           const active = number !== 8
@@ -211,11 +212,12 @@ test('convoca desde la plantilla del partido y conserva nombres y dorsales offli
   await page.reload()
   await page.getByRole('button', { name: 'Preparar convocatoria', exact: true }).click()
   const editor = page.getByRole('form', { name: 'Editar convocatoria del partido' })
-  await expect(editor.getByRole('button', { name: /Deportista [1-7]$/ })).toHaveCount(7)
+  await expect(editor.getByRole('button', { name: /Deportista (10|[1-7])$/ })).toHaveCount(8)
   await expect(editor.getByRole('button', { name: /Deportista [89]$/ })).toHaveCount(0)
   for (let number = 1; number <= 7; number++) {
     await editor.getByRole('button', { name: new RegExp(`Deportista ${number}$`) }).click()
   }
+  await editor.getByRole('button', { name: /Deportista 10$/ }).click()
   const save = editor.getByRole('button', { name: 'Guardar convocatoria', exact: true })
   await save.click()
   await expect(editor.getByRole('alert')).toContainText('al menos un líbero')
@@ -224,11 +226,50 @@ test('convoca desde la plantilla del partido y conserva nombres y dorsales offli
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await save.click()
   const roster = page.getByRole('list', { name: 'Deportistas convocados' })
-  await expect(roster.getByRole('listitem')).toHaveCount(7)
+  await expect(roster.getByRole('listitem')).toHaveCount(8)
   await expect(roster.getByRole('listitem').filter({ hasText: 'Deportista 7' })).toContainText('Líbero')
   await page.reload()
-  await expect(roster.getByRole('listitem')).toHaveCount(7)
-  await expect(roster.getByRole('listitem').filter({ hasText: 'Deportista 1' })).toContainText('#1')
+  await expect(roster.getByRole('listitem')).toHaveCount(8)
+  await expect(roster.getByRole('listitem').filter({ has: page.getByText('Deportista 1', { exact: true }) })).toContainText('#1')
   await page.getByRole('button', { name: 'Editar convocatoria', exact: true }).click()
   await expect(editor.getByRole('checkbox', { name: 'Designar líbero a Deportista 7 #7' })).toBeChecked()
+  await editor.getByRole('button', { name: 'Cancelar', exact: true }).click()
+
+  await page.getByRole('button', { name: 'Preparar alineación', exact: true }).click()
+  const lineup = page.getByRole('form', { name: 'Preparar alineación del primer set' })
+  const eligible = lineup.getByRole('list', { name: 'Convocados elegibles como titulares' })
+  await expect(eligible.getByRole('button', { name: /Deportista 7/ })).toHaveCount(0)
+  await expect(eligible.getByRole('button')).toHaveCount(7)
+  const court = lineup.getByRole('group', { name: 'Asignar posiciones' })
+  await expect(court.getByRole('button')).toHaveCount(6)
+  const confirm = lineup.getByRole('button', { name: 'Confirmar alineación y saque' })
+  for (let number = 1; number <= 5; number++) {
+    await eligible.getByRole('button', { name: new RegExp(`Deportista ${number}$`) }).click()
+  }
+  await expect(eligible.getByRole('button', { name: /Deportista 1 Titular asignado$/ })).toBeDisabled()
+  await confirm.click()
+  await expect(lineup.getByRole('alert')).toContainText('exactamente seis')
+  await eligible.getByRole('button', { name: /Deportista 6$/ }).click()
+  await confirm.click()
+  await expect(lineup.getByRole('alert')).toContainText('saque inicial')
+  await lineup.getByRole('radio', { name: 'Club Costa (rival)', exact: true }).check()
+  await confirm.click()
+  await expect(page.getByText('Listo para saque', { exact: true })).toBeVisible()
+  const summary = page.getByRole('region', { name: 'Alineación inicial · Set 1' })
+  await expect(summary.getByRole('group', { name: 'Posición 1', exact: true })).toContainText('Deportista 1')
+  await expect(summary.getByRole('list', { name: 'Banca', exact: true })).toContainText('Deportista 10')
+  await expect(summary.getByRole('list', { name: 'Líberos designados' })).toContainText('Deportista 7')
+  await expect(summary.getByRole('list', { name: 'Banca', exact: true })).not.toContainText('Deportista 7')
+  await expect(summary.getByText('Club Costa', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Editar convocatoria', exact: true })).toHaveCount(0)
+
+  await page.reload()
+  await expect(summary.getByText('Club Costa', { exact: true })).toBeVisible()
+  await summary.getByRole('button', { name: 'Corregir alineación' }).click()
+  await expect(lineup.getByRole('radio', { name: 'Club Costa (rival)' })).toBeChecked()
+  await lineup.getByRole('radio', { name: 'Iruka Sub 16 (equipo propio)' }).check()
+  await confirm.click()
+  await expect(summary.getByText('Iruka Sub 16', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await summary.screenshot({ path: 'test-results/alineacion-movil.png' })
 })
