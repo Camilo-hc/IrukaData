@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
 import type { CallUpDirectory } from '../../application/matches/ports'
 import type { MatchManagement } from '../../application/matches/service'
+import type { SaveResult } from '../../application/shared/save-result'
 import type { Match, MatchRoster, MatchSet } from '../../domain/match/contracts'
-import { COURT_POSITIONS, POSITIONS, nextOpenPosition, splitLineupRoster } from '../../domain/match/lineup'
+import { COURT_POSITIONS, POSITIONS, nextOpenPosition, splitLineupRoster, type LineupInput } from '../../domain/match/lineup'
 import type { Position, Positions, Side } from '../../domain/shared/types'
 import { useSave } from '../shared/useSave'
 
@@ -30,11 +31,13 @@ export function LineupPanel({ match, teamName, directory, canEdit, management }:
     <h2 id="lineup-title">Alineación inicial · Set 1</h2>
     {notice && <p role="status" className="notice">{notice}</p>}
     {editor ? <LineupEditor
-      match={editor.match}
-      firstSet={editor.firstSet}
+      setLabel="primer set"
+      initialOrder={editor.firstSet?.initialOrder}
+      initialService={editor.firstSet?.initialService}
       roster={roster}
       teams={teams}
-      management={management}
+      save={(input) => management.saveInitialLineup(editor.match, input)}
+      successMessage="Alineación y servicio guardados. Set 1 listo para el saque."
       editable={editable}
       onCancel={() => setEditor(null)}
       onSaved={(message) => {
@@ -61,19 +64,23 @@ export function LineupPanel({ match, teamName, directory, canEdit, management }:
   </section>
 }
 
-function LineupEditor({ match, firstSet, roster, teams, management, editable, onCancel, onSaved }: {
-  match: Match
-  firstSet: MatchSet | undefined
+export function LineupEditor({
+  setLabel, initialOrder, initialService, roster, teams, save, successMessage, editable, onCancel, onSaved,
+}: {
+  setLabel: string
+  initialOrder: Order | undefined
+  initialService: Side | undefined
   roster: readonly MatchRoster[]
   teams: Record<Side, string>
-  management: MatchManagement
+  save: (input: LineupInput) => Promise<SaveResult>
+  successMessage: string
   editable: boolean
   onCancel: () => void
   onSaved: (message: string) => void
 }) {
   const [position, setPosition] = useState<Position>(1)
-  const [order, setOrder] = useState<Order>(() => firstSet?.initialOrder ?? {})
-  const [service, setService] = useState<Side | null>(() => firstSet?.initialService ?? null)
+  const [order, setOrder] = useState<Order>(() => initialOrder ?? {})
+  const [service, setService] = useState<Side | null>(() => initialService ?? null)
   const slotRefs = useRef<Partial<Record<Position, HTMLButtonElement>>>({})
   const { busy, result, run, clearResult } = useSave(onSaved)
   const assigned = new Set(Object.values(order))
@@ -90,14 +97,14 @@ function LineupEditor({ match, firstSet, roster, teams, management, editable, on
     clearResult()
   }
 
-  return <form aria-label="Preparar alineación del primer set" onSubmit={(event) => {
+  return <form aria-label={`Preparar alineación del ${setLabel}`} onSubmit={(event) => {
     event.preventDefault()
     if (!editable) return
     const starters = POSITIONS.flatMap((slot) => {
       const playerId = order[slot]
       return playerId ? [{ position: slot, playerId }] : []
     })
-    void run(() => management.saveInitialLineup(match, { starters, initialService: service }), 'Alineación y servicio guardados. Set 1 listo para el saque.')
+    void run(() => save({ starters, initialService: service }), successMessage)
   }}>
     <fieldset disabled={busy || !editable}>
       <legend className="sr-only">Titulares y primer saque</legend>

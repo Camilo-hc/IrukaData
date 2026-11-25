@@ -1,22 +1,24 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { MatchManagement } from '../../application/matches/service'
+import type { LiveMatchManagement } from '../../application/live/service'
 import type { Match } from '../../domain/match/contracts'
 import { participationIsActive, resolveMatchContext } from '../../domain/match/context'
 import { MATCH_LOCATIONS } from '../../domain/match/validation'
 import { nameKey } from '../../domain/shared/validation'
 import { MatchForm } from './MatchForm'
 import { CallUpPanel } from './CallUpPanel'
+import { LiveMatchWorkspace } from './LiveMatchWorkspace'
 import { formatMatchDate, MATCH_PHASES, participationLabel } from './labels'
 import { RulesSummary } from './RulesFields'
 import { useMatchDirectory } from './useMatchDirectory'
 import { useSave } from '../shared/useSave'
 
-export function MatchesPage({ management }: { management: MatchManagement }) {
+export function MatchesPage({ management, liveManagement }: { management: MatchManagement; liveManagement: LiveMatchManagement }) {
   const { competitionId, matchId } = useParams<{ competitionId: string; matchId: string }>()
-  return <MatchWorkspace key={matchId ?? competitionId ?? 'all'} management={management} competitionId={competitionId} matchId={matchId} />
+  return <MatchWorkspace key={matchId ?? competitionId ?? 'all'} management={management} liveManagement={liveManagement} competitionId={competitionId} matchId={matchId} />
 }
-function MatchWorkspace({ management, competitionId, matchId }: { management: MatchManagement; competitionId: string | undefined; matchId: string | undefined }) {
+function MatchWorkspace({ management, liveManagement, competitionId, matchId }: { management: MatchManagement; liveManagement: LiveMatchManagement; competitionId: string | undefined; matchId: string | undefined }) {
   const { directory, failed, retry } = useMatchDirectory(management)
   const [editor, setEditor] = useState<{ current: Match | null } | null>(null)
   const [notice, setNotice] = useState('')
@@ -54,7 +56,12 @@ function MatchWorkspace({ management, competitionId, matchId }: { management: Ma
     {notice && <p className="notice" role="status">{notice}</p>}
     {mutation.result && !mutation.result.ok && <p className="form-error" role="alert">{mutation.result.message}</p>}
     {editor && <MatchForm key={editor.current?.id ?? 'new'} current={editor.current} competitionId={competitionId} directory={directory} management={management} onSaved={(message) => { if (!editor.current) setShowArchived(false); setEditor(null); setNotice(message) }} onCancel={() => setEditor(null)} />}
-    {selected ? <>
+    {selected ? <LiveMatchWorkspace
+      key={`live-${selected.id}`}
+      match={selected}
+      ownName={selectedContext?.team.name ?? 'Equipo propio'}
+      management={liveManagement}
+    >
       {!participationIsActive(selectedContext) && <p className="notice">El torneo, equipo, temporada o su asociación están inactivos. Los datos se conservan; reactiva las referencias para editar o restaurar este partido.</p>}
       <article className="athlete-profile"><dl className="profile-fields"><div><dt>Fecha y hora de la sede</dt><dd>{formatMatchDate(selected.scheduledAt)}</dd></div><div><dt>Sede</dt><dd>{selected.venue}</dd></div><div><dt>Condición</dt><dd>{MATCH_LOCATIONS[selected.location]}</dd></div><div><dt>Fase o jornada</dt><dd>{selected.stage || 'Sin indicar'}</dd></div></dl>{actions(selected)}<RulesSummary rules={selected.rulesSnapshot} /></article>
       <CallUpPanel
@@ -65,7 +72,7 @@ function MatchWorkspace({ management, competitionId, matchId }: { management: Ma
         canEdit={selected.active && !editor && !mutation.busy && participationIsActive(selectedContext)}
         management={management}
       />
-    </> : <>
+    </LiveMatchWorkspace> : <>
       <div className="catalog-toolbar"><button className="button" disabled={Boolean(editor) || mutation.busy || !canCreate} onClick={() => open(null)}>Nuevo partido</button><Link className="text-link" to="/torneos">Ver torneos</Link><label className="checkbox-label"><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />Ver solo partidos archivados</label></div>
       {!canCreate && <p className="notice">Para crear partidos necesitas un torneo y una participación activos, con equipo y temporada activos.</p>}
       <div className="catalog-filters">

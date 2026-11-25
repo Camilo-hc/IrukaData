@@ -1,3 +1,4 @@
+import type { LiveMatchManagement } from '../application/live/service'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
@@ -37,9 +38,11 @@ const matches: MatchManagement = {
   setActive: async () => ({ ok: true }),
 }
 
+const live: LiveMatchManagement = { observe: () => () => {}, dispatch: async () => ({ ok: false, message: 'Sin partido.' }) }
+
 describe('pantalla inicial', () => {
   it('muestra el alcance y permite consultar la demostración', async () => {
-    render(<MemoryRouter><App storageHealth={available} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} competitionManagement={competitions} matchManagement={matches} /></MemoryRouter>)
+    render(<MemoryRouter><App storageHealth={available} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} competitionManagement={competitions} matchManagement={matches} liveMatchManagement={live} /></MemoryRouter>)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Todo comienza')
     expect(await screen.findByRole('status')).toHaveTextContent('Almacenamiento local disponible')
     fireEvent.click(screen.getByRole('link', { name: 'Explorar datos de ejemplo' }))
@@ -50,12 +53,12 @@ describe('pantalla inicial', () => {
   })
 
   it('explica que no podrá guardar si IndexedDB no está disponible', async () => {
-    render(<MemoryRouter><App storageHealth={{ check: async () => 'unavailable' }} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} competitionManagement={competitions} matchManagement={matches} /></MemoryRouter>)
+    render(<MemoryRouter><App storageHealth={{ check: async () => 'unavailable' }} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} competitionManagement={competitions} matchManagement={matches} liveMatchManagement={live} /></MemoryRouter>)
     expect(await screen.findByText(/No se pueden guardar datos/)).toBeVisible()
   })
 
   it('ofrece volver al inicio desde una ruta desconocida', async () => {
-    render(<MemoryRouter initialEntries={['/inexistente']}><App storageHealth={available} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} competitionManagement={competitions} matchManagement={matches} /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/inexistente']}><App storageHealth={available} clubManagement={management} athleteManagement={athletes} membershipManagement={memberships} competitionManagement={competitions} matchManagement={matches} liveMatchManagement={live} /></MemoryRouter>)
     expect(screen.getByRole('heading', { name: 'Página no encontrada' })).toBeVisible()
     expect(await screen.findByRole('status')).toHaveTextContent('Almacenamiento local disponible')
   })

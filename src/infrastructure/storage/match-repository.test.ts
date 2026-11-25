@@ -6,12 +6,15 @@ import { createCompetitionManagement } from '../../application/competitions/serv
 import { DEFAULT_RULES_INPUT, rulesToInput, validateRules } from '../../domain/rules/configuration'
 import type { Match } from '../../domain/match/contracts'
 import type { CallUpSelection } from '../../domain/match/call-up'
+import type { LiveCommand } from '../../application/live/ports'
+import { currentSet, targetRallyId } from '../../domain/match/engine'
 import { POSITIONS, type LineupInput } from '../../domain/match/lineup'
 import type { Id } from '../../domain/shared/types'
 import { DexieClubRepository } from './club-repository'
 import { DexieCompetitionRepository } from './competition-repository'
 import { DexieMatchRepository } from './match-repository'
 import { IrukaDatabase } from './database'
+import { DexieLiveMatchRepository } from './live-match-repository'
 
 const databases: IrukaDatabase[] = []
 let sequence = 0
@@ -92,7 +95,7 @@ describe('partidos asociados a torneos', () => {
     expect((await repository.read()).matches).toEqual([records.matches])
     expect(await db.matchSets.count()).toBe(0)
     for (const [table, record] of Object.entries(records)) expect(await db.table(table).toArray()).toEqual([record])
-    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '8' })
+    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '9' })
     expect(await db.appMetadata.get('keep')).toEqual({ key: 'keep', value: 'conservar' })
   })
 
@@ -368,5 +371,104 @@ describe('confirmación del primer set', () => {
     const current = (await repository.read()).matches[0]!
     expect((await management.saveInitialLineup(current, { ...input, initialService: 'opponent' })).ok).toBe(false)
     expect((await repository.readCallUp(match.id)).firstSet).toMatchObject({ status: 'active', initialService: 'own' })
+  })
+})
+
+async function preparedLive() {
+  const fixture = await withConfirmedCallUp()
+  expect(await fixture.management.saveInitialLineup(fixture.match, { ...fixture.input, initialService: 'opponent' })).toEqual({ ok: true })
+  const live = new DexieLiveMatchRepository(fixture.db)
+  const before = await live.read(fixture.match.id)
+  if (before.status !== 'ready') throw new Error('Falta preparar el primer set.')
+  const matchId = before.match.id
+  let version = before.match.version
+  let operationNumber = 0
+
+  function operation(expectedVersion = version) {
+    operationNumber += 1
+    return { operationId: `live-${operationNumber}` as Id<'Operation'>, expectedVersion, timestamp: '2026-11-22T14:00:00Z' }
+  }
+
+  async function dispatch(command: LiveCommand) {
+    const outcome = await live.dispatch(matchId, command, operation())
+    if (!outcome.ok) throw new Error(outcome.message)
+    version = outcome.view.match.version
+    return outcome.view
+  }
+
+  return { ...fixture, before, live, matchId, operation, dispatch }
+}
+
+describe('anotación en vivo en IndexedDB', () => {
+  it('retoma una jugada abierta y deshace el punto terminal sin perder el historial físico', async () => {
+    const fixture = await preparedLive()
+    const { live, matchId, db, dispatch, input } = fixture
+    const started = await dispatch({ type: 'begin_match' })
+    if (started.status !== 'started') throw new Error('No se abrió el partido.')
+    expect(started.canUndo).toBe(false)
+    const rallyId = targetRallyId(started.engine)!
+    const playerId = input.starters[0]!.playerId
+    const open = await dispatch({ type: 'record_action', playerId, rallyId, action: { action: 'reception', result: 'positiva' } })
+    expect((await live.read(matchId))).toEqual(open)
+    await dispatch({ type: 'record_action', playerId, rallyId, action: { action: 'attack', result: 'punto' } })
+    const restored = await dispatch({ type: 'undo' })
+    if (restored.status !== 'started' || open.status !== 'started') throw new Error('No se recuperó la jugada.')
+    expect(restored.engine.phase).toBe('JUGADA_EN_CURSO')
+    expect(currentSet(restored.engine)).toEqual(currentSet(open.engine))
+    expect(restored.engine.lastSequence).toBeGreaterThan(open.engine.lastSequence)
+    expect(restored.recent.map((event) => event.type)).toEqual(['correction', 'technical_action', 'set_started'])
+    const log = await db.liveBatches.where('matchId').equals(matchId).sortBy('expectedVersion')
+    expect(log).toHaveLength(4)
+    expect(log.at(-1)?.events[0]).toMatchObject({ type: 'correction', payload: { targetOperationId: log[2]!.operationId } })
+    db.close()
+    expect(await new DexieLiveMatchRepository(workspace(db.name).db).read(matchId)).toEqual(restored)
+  })
+
+  it('serializa escrituras concurrentes y trata como idempotente una misma operación', async () => {
+    const { live, matchId, db, dispatch, operation } = await preparedLive()
+    const started = await dispatch({ type: 'begin_match' })
+    if (started.status !== 'started') throw new Error('No se abrió el partido.')
+    const rallyId = targetRallyId(started.engine)!
+    const point = { type: 'award_point', rallyId, winner: 'own' } as const
+    const another = new DexieLiveMatchRepository(workspace(db.name).db)
+    const contexts = [operation(), operation()] as const
+    const outcomes = await Promise.all([
+      live.dispatch(matchId, point, contexts[0]),
+      another.dispatch(matchId, point, contexts[1]),
+    ])
+    expect(outcomes.filter(({ ok }) => ok)).toHaveLength(1)
+    expect(outcomes.find(({ ok }) => !ok)).toMatchObject({ ok: false, message: expect.stringContaining('otra pestaña') })
+    const winningContext = contexts[outcomes[0]!.ok ? 0 : 1]
+    expect(await another.dispatch(matchId, point, winningContext)).toMatchObject({ ok: true, view: { match: { version: started.match.version + 1 } } })
+    expect(await db.liveBatches.count()).toBe(2)
+    const current = await live.read(matchId)
+    expect(current.status === 'started' && currentSet(current.engine)?.score).toEqual({ own: 1, opponent: 0 })
+  })
+
+  it('revierte la sesión y el set si falla una escritura al iniciar', async () => {
+    const { db, before, live, matchId, operation } = await preparedLive()
+    vi.spyOn(db.matches, 'put').mockRejectedValueOnce(new Error('Cuota agotada'))
+    await expect(live.dispatch(matchId, { type: 'begin_match' }, operation())).rejects.toThrow('Cuota agotada')
+    expect(await db.liveSessions.count()).toBe(0)
+    expect(await db.liveBatches.count()).toBe(0)
+    expect(await live.read(matchId)).toEqual(before)
+  })
+
+  it('abre el siguiente set con alineación confirmada y permite deshacer su inicio', async () => {
+    const { dispatch, input, db, matchId } = await preparedLive()
+    let view = await dispatch({ type: 'begin_match' })
+    for (let point = 0; point < 25; point += 1) {
+      if (view.status !== 'started') throw new Error('No se abrió el primer set.')
+      view = await dispatch({ type: 'award_point', winner: 'own', rallyId: targetRallyId(view.engine)! })
+    }
+    expect(view.match.phase).toBe('FIN_SET')
+    expect(await db.matchSets.get({ matchId, number: 1 })).toMatchObject({ status: 'finished', finalScore: { own: 25, opponent: 0 } })
+    view = await dispatch({ type: 'next_set', lineup: input })
+    expect(view.match.phase).toBe('LISTO_PARA_SAQUE')
+    expect(await db.matchSets.get({ matchId, number: 2 })).toMatchObject({ status: 'active', initialService: 'own' })
+    view = await dispatch({ type: 'undo' })
+    expect(view.match.phase).toBe('FIN_SET')
+    expect(await db.matchSets.get({ matchId, number: 2 })).toBeUndefined()
+    expect(await db.matchSets.get({ matchId, number: 1 })).toMatchObject({ status: 'finished', finalScore: { own: 25, opponent: 0 } })
   })
 })

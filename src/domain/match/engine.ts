@@ -41,7 +41,7 @@ export interface OperationContext {
   readonly timestamp: IsoTimestamp
 }
 
-type ErrorCode = 'version_conflict' | 'invalid_phase' | 'invalid_set' | 'invalid_lineup'
+type ErrorCode = 'version_conflict' | 'invalid_phase' | 'invalid_set' | 'invalid_lineup' | 'nothing_to_undo'
   | 'stale_rally' | 'invalid_side' | 'invalid_action' | 'player_not_on_court' | 'invalid_server'
 
 type Rejection = { status: 'rejected'; code: ErrorCode; message: string }
@@ -233,6 +233,25 @@ function finishRally(
     setsWon,
     sets: replaceCurrentSet(state, closed),
   }, context, events)
+}
+
+/** Conserva la revisión, secuencia e identidad de las operaciones al restaurar el estado de juego anterior. */
+export function undoMatchOperation(state: MatchEngine, previous: MatchEngine, target: EventBatch, context: OperationContext): EngineResult {
+  if (state.appliedOperations.includes(context.operationId)) return { status: 'already_applied', state }
+  if (context.expectedVersion !== state.version) return reject('version_conflict', 'El partido cambió. Usa la versión actual.')
+  const first = target.events[0]
+  if (!first || !previous.sets.length) return reject('nothing_to_undo', 'El primer set debe permanecer abierto para anotar.')
+  const correction: MatchEvent = {
+    ...eventEnvelope(state, context, first.setId, 1),
+    type: 'correction',
+    payload: { targetOperationId: target.operationId, reason: 'Deshacer último registro' },
+  }
+  return accept({
+    ...previous,
+    version: state.version,
+    lastSequence: state.lastSequence,
+    appliedOperations: state.appliedOperations,
+  }, context, [correction])
 }
 
 function recordAction(
