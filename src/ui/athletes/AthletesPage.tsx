@@ -58,6 +58,8 @@ export function AthletesPage({ management, clubManagement, membershipManagement 
       <div className="section-heading"><h2>Datos personales</h2><span className={`tag${profile.active ? '' : ' subtle'}`}>{profile.active ? 'Activo' : 'Archivado'}</span></div>
       <dl className="profile-fields"><div><dt>Nombre</dt><dd>{profile.name}</dd></div><div><dt>Fecha de nacimiento</dt><dd>{birthDateLabel(profile)}</dd></div><div className="full-width"><dt>Notas</dt><dd className="athlete-notes">{profile.notes ?? 'Sin notas.'}</dd></div></dl>
       <div className="form-actions">
+        <Link className="button secondary" to={'/estadisticas?deportista=' + encodeURIComponent(profile.id)}>Ver estadísticas</Link>
+        <Link className="button secondary" to={'/historial?deportista=' + encodeURIComponent(profile.id)}>Ver historial de partidos</Link>
         {profile.active && <button className="button" disabled={editor !== undefined || mutation.busy} onClick={() => { setNotice(''); setEditor(profile) }}>Editar perfil</button>}
         <button className="button secondary" disabled={editor !== undefined || mutation.busy} onClick={() => archive(profile)}>{profile.active ? 'Archivar deportista' : 'Restaurar deportista'}</button>
       </div>

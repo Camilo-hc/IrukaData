@@ -15,6 +15,10 @@ import { DexieMatchRepository } from './infrastructure/storage/match-repository'
 import { createMatchManagement } from './application/matches/service'
 import { createLiveMatchManagement } from './application/live/service'
 import { DexieLiveMatchRepository } from './infrastructure/storage/live-match-repository'
+import { createReportManagement } from './application/reports/service'
+import { DexieReportRepository } from './infrastructure/storage/report-repository'
+import { createBackupManagement } from './application/backup/service'
+import { DexieBackupRepository } from './infrastructure/storage/backup-repository'
 import './ui/styles.css'
 
 const database = new IrukaDatabase()
@@ -28,12 +32,19 @@ const athleteManagement = createAthleteManagement(new DexieAthleteRepository(dat
 })
 const matchManagement = createMatchManagement(new DexieMatchRepository(database), () => crypto.randomUUID())
 const liveMatchManagement = createLiveMatchManagement(new DexieLiveMatchRepository(database), () => crypto.randomUUID(), () => new Date().toISOString())
+const reportManagement = createReportManagement(new DexieReportRepository(database))
+const backupManagement = createBackupManagement(new DexieBackupRepository(database), () => new Date().toISOString())
 const container = document.getElementById('root')
 if (!container) throw new Error('No se encontró el contenedor de IrukaData.')
 
 // Composición: la UI recibe puertos; nunca conoce Dexie.
 createRoot(container).render(
   <StrictMode>
-    <HashRouter><App storageHealth={storageHealth} clubManagement={clubManagement} athleteManagement={athleteManagement} membershipManagement={membershipManagement} competitionManagement={competitionManagement} matchManagement={matchManagement} liveMatchManagement={liveMatchManagement} /></HashRouter>
+    <HashRouter>
+      <App storageHealth={storageHealth} clubManagement={clubManagement} athleteManagement={athleteManagement}
+        membershipManagement={membershipManagement} competitionManagement={competitionManagement}
+        matchManagement={matchManagement} liveMatchManagement={liveMatchManagement}
+        reportManagement={reportManagement} backupManagement={backupManagement} />
+    </HashRouter>
   </StrictMode>,
 )

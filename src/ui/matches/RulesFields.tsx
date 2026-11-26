@@ -12,7 +12,7 @@ export function RulesFields({ input, onChange, fields }: { input: RulesInput; on
       <div className="field"><label htmlFor="match-libero-threshold">Exigir 2 líberos si la convocatoria supera (opcional)</label><input id="match-libero-threshold" inputMode="numeric" placeholder="Por ejemplo, 12" value={input.twoLiberosAbove} onChange={(event) => onChange({ ...input, twoLiberosAbove: event.target.value })} aria-invalid={Boolean(fields?.twoLiberosAbove)} aria-describedby="match-libero-threshold-error match-libero-threshold-help" /><span id="match-libero-threshold-error" className="field-error">{fields?.twoLiberosAbove}</span><span className="field-hint" id="match-libero-threshold-help">Déjalo vacío si el torneo no exige esta condición.</span></div>
     </div>
     <label className="checkbox-label"><input type="checkbox" checked={input.decidingSideChange} onChange={(event) => onChange({ ...input, decidingSideChange: event.target.checked })} />Avisar cambio de lado a los 8 puntos del tercer set</label>
-    <p className="catalog-help">Estas reglas se guardan con este partido. La ejecución de sustituciones y reemplazos se incorporará más adelante; no incluye situaciones excepcionales.</p>
+    <p className="catalog-help">El panel en vivo aplica estas reglas a las sustituciones y los reemplazos ordinarios del partido.</p>
   </fieldset>
 }
 

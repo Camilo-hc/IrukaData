@@ -4,7 +4,7 @@ IrukaData es una aplicación en desarrollo para gestionar equipos de vóleibol y
 
 El proyecto prioriza el funcionamiento local y sin conexión, una interfaz en español y controles adecuados para notebook y tablet. Su objetivo es reunir acciones técnicas, marcador, rotaciones, sustituciones oficiales y reemplazos de líbero en un mismo panel de partido.
 
-**Estado actual:** la aplicación permite configurar un club, gestionar equipos y temporadas, mantener perfiles de deportistas e inscribirlos en distintas plantillas con dorsales independientes. También permite gestionar torneos y preparar partidos con su convocatoria, alineación inicial y servicio. Desde el panel en vivo se registran acciones, puntos, sustituciones oficiales y reemplazos de líbero, con guardado automático y reanudación sin conexión.
+**Estado actual:** la aplicación permite gestionar equipos, temporadas, deportistas, inscripciones, torneos y partidos. El panel en vivo guarda acciones, puntos y cambios sin conexión. El registro alimenta las estadísticas y el historial, y se puede conservar en un respaldo JSON local.
 
 ## Objetivos
 
@@ -17,12 +17,7 @@ El proyecto prioriza el funcionamiento local y sin conexión, una interfaz en es
 
 ## Funcionalidades previstas
 
-Las siguientes funcionalidades forman parte del alcance previsto y **todavía no están disponibles como flujos operativos**:
-
-| Área | Alcance previsto |
-| --- | --- |
-| Estadísticas e historial | Métricas individuales y de equipo derivadas de las acciones registradas, con filtros por partido, set, torneo, categoría y temporada. |
-| Respaldos | Exportación e importación de los datos locales para recuperar el historial. |
+El último hito está dedicado a la validación de partidos completos en cancha, la accesibilidad táctil y las pruebas de recuperación y restauración del MVP.
 
 El registro individual cubre a los jugadores del propio club. El rival se identifica por su nombre, marcador y equipo al servicio.
 
@@ -56,6 +51,9 @@ El registro individual cubre a los jugadores del propio club. El rival se identi
 - Cupo de cambios oficiales por set, pareja titular–suplente y reingreso a la casilla original de la alineación. Los reemplazos de líbero conservan a la persona regular vinculada y se registran fuera del cupo oficial. Si la rotación lleva a la líbero a la delantera, el panel pide registrar el retorno antes de continuar.
 - Reanudación después de recargar o cerrar la ficha, incluso con una jugada abierta. «Deshacer» registra una corrección y restaura el estado previo, incluida la ocupación de cancha y el cupo de sustituciones. El inicio del primer set se conserva.
 - Alineación y servicio independientes para cada set. Entre sets puedes armar una alineación nueva o editar una copia de la anterior. Si corresponde, el panel avisa el cambio de lado al llegar al umbral del tercer set.
+- Historial de partidos de solo lectura con marcador por set, dorsales de la convocatoria, acciones, cambios y correcciones. Incluye filtros por deportista, equipo, categoría, temporada, torneo, partido y set.
+- Estadísticas por deportista y equipo derivadas del historial efectivo, con los mismos filtros y descarga CSV. Los puntos manuales no se atribuyen a un deportista y los registros deshechos quedan fuera del cálculo. La participación se cuenta por partido y set a partir de la alineación y las entradas registradas.
+- Respaldos JSON versionados. La vista previa compara los registros locales y los del archivo. La restauración valida las referencias y reconstruye el historial antes de sustituir los datos en una transacción.
 - Demostración estática de solo lectura con nombres y equipos ficticios; sus datos no se insertan en la base del club.
 - Estructura modular que separa dominio, estadísticas, aplicación, almacenamiento e interfaz.
 - Contratos tipados para identidad, inscripciones, reglas por partido, eventos, cambios y proyecciones estadísticas, junto a un catálogo central de 22 resultados técnicos.
@@ -81,7 +79,7 @@ Los partidos requieren una participación, torneo, equipo, asociación y tempora
 | Hito 3 — Motor puro de partido | Estados de partido y jugada, puntuación, servicio, rotaciones y cierre de sets y partidos. | Motor implementado y probado como módulo |
 | Hito 4 — Panel de anotación en vivo | Interfaz táctil para acciones y puntos, eventos recientes, deshacer, guardado automático y reanudación. | Implementado |
 | Hito 5 — Cambios oficiales y reemplazos de líbero | Flujos de cambio dentro del panel, validación de elegibilidad y reingresos, límites configurables y seguimiento del vínculo líbero–jugador regular. | Implementado |
-| Hito 6 — Estadísticas, historial y respaldo | Estadísticas derivadas de eventos, filtros, consulta del historial y exportación/importación de respaldos. | Planificado |
+| Hito 6 — Estadísticas, historial y respaldo | Estadísticas derivadas de eventos, filtros, consulta del historial y exportación/importación de respaldos. | Implementado |
 | Hito 7 — Calidad y lanzamiento del MVP | Validación de partidos completos offline, accesibilidad táctil, pulsaciones repetidas, recuperación, restauración de respaldos y preparación para uso real. | Planificado |
 
 ## Tecnologías
@@ -146,4 +144,4 @@ La descarga inicial del navegador de pruebas requiere internet. El build no desc
 
 La caché offline disponible cubre los recursos de la aplicación. Después de su preparación inicial, la gestión de equipos, temporadas, deportistas, inscripciones, torneos, partidos, convocatorias y alineaciones iniciales permite guardar datos y volver a consultarlos sin conexión. La demostración continúa separada de los datos reales del club. Los partidos, sus reglas, sus convocatorias, el marcador y la jugada abierta se recuperan al recargar o reabrir la aplicación.
 
-IndexedDB pertenece al navegador y al dispositivo. Borrar los datos de la aplicación puede eliminar su almacenamiento local; la función de respaldo todavía está planificada. El uso como registro deportivo real deberá esperar a que estén implementados y verificados los flujos de partido y recuperación de datos.
+IndexedDB pertenece al navegador y al dispositivo. Desde **Respaldos** puedes descargar una copia JSON y solicitar almacenamiento persistente si el navegador lo permite. Para recuperar datos, selecciona un respaldo, revisa los registros de la vista previa y confirma la restauración. El archivo restaurado reemplaza los datos locales.
