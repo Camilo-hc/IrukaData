@@ -153,6 +153,32 @@ button.lineup-slot[aria-pressed="true"] { border-color: #00766b; outline: 2px so
 .lineup-reserves li { display: flex; gap: .5rem; overflow-wrap: anywhere; }
 .lineup-reserves p { margin: 0; }
 .lineup-service .checkbox-label { overflow-wrap: anywhere; }
+.live-board { display: grid; gap: 1rem; margin-bottom: 1rem; }
+.live-board > h2, .live-board h3, .live-board p { margin: 0; }
+.live-scoreboard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; padding: clamp(.8rem, 3vw, 1.5rem); background: #102c38; color: #fff; border-radius: 12px; }
+.live-scoreboard-heading, .live-serving { grid-column: 1 / -1; }
+.live-scoreboard-heading { display: flex; justify-content: space-between; gap: .7rem; }
+.live-scoreboard-heading span, .live-set-wins { color: #b9d8df; font-size: .875rem; }
+.live-side { display: grid; justify-items: center; align-content: space-between; gap: .2rem; padding: .65rem; border: 1px solid #3d606f; border-radius: 8px; text-align: center; }
+.live-team { overflow-wrap: anywhere; font-weight: 650; }
+.live-points { font-size: clamp(2.6rem, 7vw, 5rem); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; color: #83e9d6; }
+.live-serving { text-align: center; color: #fff; }
+.live-set-results { display: flex; flex-wrap: wrap; gap: .5rem 1.1rem; margin: 0; padding: 0; list-style: none; }
+.live-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+.live-panel { min-width: 0; display: grid; align-content: start; gap: .75rem; background: #fff; border: 1px solid #c5d8de; border-radius: 10px; padding: clamp(.7rem, 2vw, 1.15rem); }
+.live-player { min-height: 1.75em; overflow-wrap: anywhere; }
+.live-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.live-actions .button { padding: .55rem .35rem; min-height: 48px; text-align: center; overflow-wrap: anywhere; }
+.live-actions .button[aria-pressed="true"] { border-color: #00766b; box-shadow: inset 0 0 0 1px #00766b; background: #e1f4ef; }
+.live-results { padding-top: .65rem; border-top: 1px solid #c5d8de; }
+.live-results .button { flex-direction: column; }
+.live-result-point { color: #49616d; font-size: .75rem; font-weight: 500; }
+.live-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .55rem; }
+.live-controls .button { min-height: 48px; }
+.live-side-change { padding: .75rem; color: #384005; background: #f2f7d3; border-left: 3px solid #839127; }
+.live-history { list-style: none; margin: 0; padding: 0; }
+.live-history li { padding: .4rem 0; border-top: 1px solid #e2edf0; overflow-wrap: anywhere; }
+@media (max-width: 730px) { .live-grid { grid-template-columns: 1fr; } .live-controls .button { flex-grow: 1; } }
 @media (max-width: 760px) { .match-grid { grid-template-columns: 1fr; } }
 @media (min-width: 761px) { .app-header nav { flex-wrap: wrap; gap: .2rem 1.2rem; } }
 @media (max-width: 760px) { .competition-filters { grid-template-columns: 1fr; } }

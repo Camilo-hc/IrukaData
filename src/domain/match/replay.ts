@@ -1,11 +1,21 @@
 import type { TechnicalAction } from '../actions/catalog'
 import type { EventBatch, MatchEvent } from './events'
-import { applyMatchCommand, type MatchCommand, type MatchEngine } from './engine'
+import { applyMatchCommand, undoMatchOperation, type MatchCommand, type MatchEngine } from './engine'
 import { POSITIONS } from './lineup'
 
 type ReplayResult =
   | { status: 'replayed'; state: MatchEngine }
   | { status: 'invalid_log'; batchNumber: number; message: string }
+
+interface AppliedOperation {
+  readonly batch: EventBatch
+  readonly before: MatchEngine
+}
+
+export interface MatchTimeline {
+  readonly state: MatchEngine
+  readonly effective: readonly AppliedOperation[]
+}
 
 function commandFromEvents(state: MatchEngine, first: MatchEvent): MatchCommand | undefined {
   switch (first.type) {
@@ -43,25 +53,37 @@ function comparableJson(value: unknown): string {
 
 /** Reconstruye desde la versión inicial del partido y sus lotes, en orden. */
 export function replayMatch(initial: MatchEngine, log: readonly EventBatch[]): ReplayResult {
+  const result = replayTimeline(initial, log)
+  return result.status === 'replayed' ? { status: 'replayed', state: result.state } : result
+}
+
+export function replayTimeline(initial: MatchEngine, log: readonly EventBatch[]): ({ status: 'replayed' } & MatchTimeline) | Extract<ReplayResult, { status: 'invalid_log' }> {
   let state = initial
+  const effective: AppliedOperation[] = []
   for (const [index, batch] of log.entries()) {
     const first = batch.events[0]
     if (!first || batch.matchId !== state.matchId) {
       return { status: 'invalid_log', batchNumber: index + 1, message: 'El lote está vacío o pertenece a otro partido.' }
     }
-    const command = commandFromEvents(state, first)
-    if (!command) {
-      return { status: 'invalid_log', batchNumber: index + 1, message: 'El lote comienza con un evento no admitido por el motor.' }
-    }
-    const result = applyMatchCommand(state, command, {
+    const context = {
       operationId: batch.operationId,
       expectedVersion: batch.expectedVersion,
       timestamp: first.timestamp,
-    })
+    }
+    const command = commandFromEvents(state, first)
+    const target = effective.at(-1)
+    const result = first.type === 'correction'
+      ? target && undoMatchOperation(state, target.before, target.batch, context)
+      : command && applyMatchCommand(state, command, context)
+    if (!result) {
+      return { status: 'invalid_log', batchNumber: index + 1, message: 'El lote comienza con un evento no admitido por el motor.' }
+    }
     if (result.status !== 'applied' || comparableJson(result.batch.events) !== comparableJson(batch.events)) {
       return { status: 'invalid_log', batchNumber: index + 1, message: 'La secuencia o el resultado del lote no coincide con el estado del partido.' }
     }
+    if (first.type === 'correction') effective.pop()
+    else effective.push({ batch, before: state })
     state = result.state
   }
-  return { status: 'replayed', state }
+  return { status: 'replayed', state, effective }
 }
