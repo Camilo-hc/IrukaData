@@ -2,8 +2,9 @@ import { technicalResult, type TechnicalAction } from '../actions/catalog'
 import type { RulesSnapshot } from '../rules/contracts'
 import type { Id, IsoTimestamp, Position, Positions, Score, Side } from '../shared/types'
 import type { Match, MatchRoster, MatchSet, Rally, RotationSlot } from './contracts'
-import type { EventBatch, MatchEvent } from './events'
+import type { EventBatch, MatchEvent, OfficialSubstitutionEvent, PlayerChangeSelection } from './events'
 import { POSITIONS, validateLineup, type LineupInput } from './lineup'
+import { INITIAL_COURT_CHANGES, liberoReturnRequired, planLiberoReplacement, planOfficialRequest, type CourtChanges } from './player-changes'
 
 type EnginePhase = 'ALINEACION_SET' | 'LISTO_PARA_SAQUE' | 'JUGADA_EN_CURSO' | 'ENTRE_JUGADAS' | 'FIN_SET' | 'FIN_PARTIDO'
 type SetNumber = MatchSet['number']
@@ -14,6 +15,8 @@ export interface SetProgress {
   readonly serving: Side
   readonly rotation: Positions<RotationSlot>
   readonly latestRally: Rally | null
+  readonly completedRallies: number
+  readonly changes: CourtChanges
 }
 
 export interface MatchEngine {
@@ -34,6 +37,8 @@ export type MatchCommand =
   | Readonly<{ type: 'start_set'; setId: MatchSet['id']; number: SetNumber; lineup: LineupInput }>
   | Readonly<{ type: 'record_action'; playerId: MatchRoster['id']; action: TechnicalAction } & RallyReference>
   | Readonly<{ type: 'award_point'; winner: Side } & RallyReference>
+  | Readonly<{ type: 'official_substitution'; setId: MatchSet['id']; selections: readonly PlayerChangeSelection[] }>
+  | Readonly<{ type: 'libero_replacement'; setId: MatchSet['id'] } & PlayerChangeSelection>
 
 export interface OperationContext {
   readonly operationId: EventBatch['operationId']
@@ -43,6 +48,7 @@ export interface OperationContext {
 
 type ErrorCode = 'version_conflict' | 'invalid_phase' | 'invalid_set' | 'invalid_lineup' | 'nothing_to_undo'
   | 'stale_rally' | 'invalid_side' | 'invalid_action' | 'player_not_on_court' | 'invalid_server'
+  | 'invalid_change' | 'libero_return_required' | 'invalid_libero_action'
 
 type Rejection = { status: 'rejected'; code: ErrorCode; message: string }
 export type EngineResult =
@@ -161,6 +167,8 @@ function startSet(state: MatchEngine, command: Extract<MatchCommand, { type: 'st
     score: emptyScore,
     serving: initialService,
     latestRally: null,
+    completedRallies: 0,
+    changes: INITIAL_COURT_CHANGES,
     rotation: positions((position) => {
       const id = initialOrder[position]
       return { slotId: position, startingPlayerId: id, rotationOwnerId: id, courtOccupantId: id }
@@ -206,17 +214,18 @@ function finishRally(
   const target = progress.set.number === 3 ? format.decidingSetTarget : format.regularSetTarget
   const closesSet = score[winner] >= target && score[winner] - score[other] >= format.minimumLead
   const completedRally: Rally = { ...rally, status: 'completed', winner }
+  const played: SetProgress = {
+    ...progress, score, latestRally: completedRally, completedRallies: progress.completedRallies + 1,
+  }
   if (!closesSet) {
     const rotate = winner === 'own' && rally.initialService === 'opponent'
     const rotation = rotate ? positions((position) => progress.rotation[incomingFrom[position]]) : progress.rotation
-    const next = { ...progress, score, rotation, serving: winner, latestRally: completedRally }
+    const next = { ...played, rotation, serving: winner }
     return accept({ ...state, phase: 'ENTRE_JUGADAS', sets: replaceCurrentSet(state, next) }, context, events)
   }
 
   const closed: SetProgress = {
-    ...progress,
-    score,
-    latestRally: completedRally,
+    ...played,
     set: { ...progress.set, status: 'finished', finalScore: score },
   }
   const setsWon = addPoint(state.setsWon, winner)
@@ -233,6 +242,55 @@ function finishRally(
     setsWon,
     sets: replaceCurrentSet(state, closed),
   }, context, events)
+}
+
+function substitute(
+  state: MatchEngine,
+  progress: SetProgress,
+  selections: readonly PlayerChangeSelection[],
+  context: OperationContext,
+): EngineResult {
+  const plan = planOfficialRequest(progress, state.roster, selections)
+  if (!plan.ok) return reject('invalid_change', plan.message)
+  const rotation = { ...progress.rotation }
+  const substitutionPartners = { ...progress.changes.substitutionPartners }
+  const events = plan.value.map((payload, index): OfficialSubstitutionEvent => {
+    const { position, incomingId, slotId, substitutePlayerId } = payload
+    rotation[position] = { ...rotation[position], rotationOwnerId: incomingId, courtOccupantId: incomingId }
+    substitutionPartners[slotId] = substitutePlayerId
+    return { ...eventEnvelope(state, context, progress.set.id, index + 1), type: 'official_substitution', payload }
+  })
+  const changes: CourtChanges = {
+    ...progress.changes, substitutionPartners,
+    officialCount: progress.changes.officialCount + events.length,
+    lastOfficialRequestAt: progress.completedRallies,
+  }
+  const next = { ...progress, changes, rotation }
+  return accept({ ...state, sets: replaceCurrentSet(state, next) }, context, events)
+}
+
+function replaceLibero(
+  state: MatchEngine,
+  progress: SetProgress,
+  selection: PlayerChangeSelection,
+  context: OperationContext,
+): EngineResult {
+  const plan = planLiberoReplacement(progress, state.roster, selection)
+  if (!plan.ok) return reject('invalid_change', plan.message)
+  const payload = plan.value
+  const { position, incomingId, liberoId, regularPlayerId, slotId, direction } = payload
+  const envelope = eventEnvelope(state, context, progress.set.id, 1)
+  const changes: CourtChanges = {
+    ...progress.changes,
+    lastLiberoReplacementAt: progress.completedRallies,
+    activeLibero: direction === 'return' ? null : {
+      liberoId, regularPlayerId, slotId, enteredAtPosition: position,
+      lastReplacementSequence: envelope.sequence, completedRalliesAtReplacement: progress.completedRallies,
+    },
+  }
+  const rotation = { ...progress.rotation, [position]: { ...progress.rotation[position], courtOccupantId: incomingId } }
+  const next = { ...progress, changes, rotation }
+  return accept({ ...state, sets: replaceCurrentSet(state, next) }, context, [{ ...envelope, type: 'libero_replacement', payload }])
 }
 
 /** Conserva la revisión, secuencia e identidad de las operaciones al restaurar el estado de juego anterior. */
@@ -266,6 +324,11 @@ function recordAction(
   if (!POSITIONS.some((position) => progress.rotation[position].courtOccupantId === command.playerId)) {
     return reject('player_not_on_court', 'Selecciona un deportista propio en cancha.')
   }
+  if (progress.changes.activeLibero?.liberoId === command.playerId && (
+    command.action.action === 'serve' || (command.action.action === 'block' && command.action.result !== 'falta')
+  )) {
+    return reject('invalid_libero_action', 'El líbero no puede sacar ni bloquear. Si hubo una falta de bloqueo, registra la falta.')
+  }
   if (command.action.action === 'serve' && (
     rally.initialService !== 'own' || progress.rotation[1].courtOccupantId !== command.playerId || progress.latestRally?.status === 'open'
   )) {
@@ -293,6 +356,15 @@ export function applyMatchCommand(state: MatchEngine, command: MatchCommand, con
 
   const progress = currentSet(state)
   if (progress?.set.status !== 'active') return reject('invalid_phase', 'Primero confirma la alineación y el saque del set.')
+  if (command.type === 'official_substitution' || command.type === 'libero_replacement') {
+    if (command.setId !== progress.set.id) return reject('invalid_set', 'El set cambió. Selecciona el cambio en el set actual.')
+    return command.type === 'official_substitution'
+      ? substitute(state, progress, command.selections, context)
+      : replaceLibero(state, progress, command, context)
+  }
+  if (liberoReturnRequired(progress)) {
+    return reject('libero_return_required', 'Registra el retorno del deportista regular antes de iniciar otra jugada.')
+  }
   const rally = rallyForInput(progress)
   if (command.rallyId !== rally.id) return reject('stale_rally', 'La jugada cambió. Usa la jugada actual.')
   if (command.type === 'record_action') return recordAction(state, progress, rally, command, context)
