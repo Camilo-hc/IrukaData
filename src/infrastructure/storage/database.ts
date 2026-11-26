@@ -1,7 +1,9 @@
 import Dexie, { type Table } from 'dexie'
 import type { StorageHealthPort, StorageStatus } from '../../application/ports'
+import type { LiveSession } from '../../application/live/ports'
 import type { Athlete, Club, Competition, CompetitionEntry, RosterMembership, Season, Team, TeamSeason } from '../../domain/club/contracts'
 import type { Match, MatchRoster, MatchSet } from '../../domain/match/contracts'
+import type { EventBatch } from '../../domain/match/events'
 
 export interface AppMetadata { key: string; value: string }
 
@@ -24,6 +26,8 @@ export class IrukaDatabase extends Dexie {
   matches!: Table<Match, Match['id']>
   matchRosters!: Table<MatchRoster, MatchRoster['id']>
   matchSets!: Table<MatchSet, MatchSet['id']>
+  liveSessions!: Table<LiveSession, Match['id']>
+  liveBatches!: Table<EventBatch, [Match['id'], number]>
 
   constructor(name = 'irukadata') {
     super(name)
@@ -58,6 +62,12 @@ export class IrukaDatabase extends Dexie {
     })
     this.version(8).stores({ matchSets: '&id, &[matchId+number], matchId' }).upgrade(async (transaction) => {
       await transaction.table('appMetadata').put({ key: 'schemaVersion', value: '8' })
+    })
+    this.version(9).stores({
+      liveSessions: '&matchId',
+      liveBatches: '[matchId+expectedVersion], matchId, &[matchId+operationId]',
+    }).upgrade(async (transaction) => {
+      await transaction.table('appMetadata').put({ key: 'schemaVersion', value: '9' })
     })
   }
 }

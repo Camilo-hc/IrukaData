@@ -1,3 +1,4 @@
+import type { LiveMatchManagement } from '../application/live/service'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import type { StorageHealthPort, StorageStatus } from '../application/ports'
@@ -22,11 +23,11 @@ function Home() {
     </div>
     <section className="foundation" aria-labelledby="foundation-title">
       <div className="section-heading"><div><p className="eyebrow">PREPARA TU TEMPORADA</p><h2 id="foundation-title">Organiza tu club</h2></div><span className="tag">Gestión local</span></div>
-      <p>Gestiona equipos, temporadas y perfiles, inscribe deportistas con sus propios dorsales y organiza los torneos de cada plantilla. Programa los partidos de cada torneo. Los datos se guardan en este dispositivo; la anotación en vivo se incorporará más adelante.</p>
+      <p>Organiza las plantillas y los torneos de tu club, prepara partidos y registra acciones desde la cancha. Los datos se guardan en este dispositivo.</p>
       <div className="feature-grid">
         <article><h3>Equipos por categoría</h3><p>Organiza equipos masculinos y femeninos desde Sub 14 hasta TC, sin mezclar la demostración con tus datos.</p></article>
         <article><h3>Un perfil, varias plantillas</h3><p>Inscribe a cada deportista en sus equipos y temporadas con dorsales independientes, conservando una sola ficha personal.</p></article>
-        <article><h3>La cancha como prioridad</h3><p>El futuro panel reunirá acciones, cambios oficiales y líbero en una misma pantalla.</p></article>
+        <article><h3>Anotación en vivo</h3><p>Registra acciones y puntos en la ficha del partido. Puedes retomar el juego sin conexión.</p></article>
       </div>
     </section>
   </>
@@ -50,7 +51,7 @@ function Demo() {
   </>
 }
 
-export function App({ storageHealth, clubManagement, athleteManagement, membershipManagement, competitionManagement, matchManagement }: { storageHealth: StorageHealthPort; clubManagement: ClubManagement; athleteManagement: AthleteManagement; membershipManagement: MembershipManagement; competitionManagement: CompetitionManagement; matchManagement: MatchManagement }) {
+export function App({ storageHealth, clubManagement, athleteManagement, membershipManagement, competitionManagement, matchManagement, liveMatchManagement }: { storageHealth: StorageHealthPort; clubManagement: ClubManagement; athleteManagement: AthleteManagement; membershipManagement: MembershipManagement; competitionManagement: CompetitionManagement; matchManagement: MatchManagement; liveMatchManagement: LiveMatchManagement }) {
   const [storage, setStorage] = useState<StorageStatus | 'checking'>('checking')
   useEffect(() => {
     let active = true
@@ -64,7 +65,7 @@ export function App({ storageHealth, clubManagement, athleteManagement, membersh
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Saltar al contenido</a>
     <header className="app-header"><Link className="brand" to="/" aria-label="IrukaData, inicio"><img src="/icon.svg" alt="" width="42" height="42" /><span>Iruka<span className="brand-light">Data</span></span></Link><nav aria-label="Navegación principal"><NavLink to="/" end>Inicio</NavLink><NavLink to="/equipos">Equipos</NavLink><NavLink to="/temporadas">Temporadas</NavLink><NavLink to="/deportistas">Deportistas</NavLink><NavLink to="/plantillas">Plantillas</NavLink><NavLink to="/torneos">Torneos</NavLink><NavLink to="/partidos">Partidos</NavLink><NavLink to="/demostracion">Demostración</NavLink></nav><span className="local-label">Vóleibol · Local</span></header>
-    <main id="main-content"><Routes><Route path="/" element={<Home />} /><Route path="/equipos" element={<ClubPage key="teams" section="teams" management={clubManagement} />} /><Route path="/temporadas" element={<ClubPage key="seasons" section="seasons" management={clubManagement} />} /><Route path="/deportistas" element={<AthletesPage key="athletes" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} /><Route path="/deportistas/:athleteId" element={<AthletesPage key="athlete-profile" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} /><Route path="/plantillas" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} /><Route path="/plantillas/:teamSeasonId" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} /><Route path="/torneos" element={<CompetitionsPage management={competitionManagement} />} /><Route path="/partidos" element={<MatchesPage management={matchManagement} />} /><Route path="/partidos/:matchId" element={<MatchesPage management={matchManagement} />} /><Route path="/torneos/:competitionId/partidos" element={<MatchesPage management={matchManagement} />} /><Route path="/demostracion" element={<Demo />} /><Route path="*" element={<div className="page-heading"><h1>Página no encontrada</h1><Link className="button" to="/">Volver al inicio</Link></div>} /></Routes></main>
+    <main id="main-content"><Routes><Route path="/" element={<Home />} /><Route path="/equipos" element={<ClubPage key="teams" section="teams" management={clubManagement} />} /><Route path="/temporadas" element={<ClubPage key="seasons" section="seasons" management={clubManagement} />} /><Route path="/deportistas" element={<AthletesPage key="athletes" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} /><Route path="/deportistas/:athleteId" element={<AthletesPage key="athlete-profile" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} /><Route path="/plantillas" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} /><Route path="/plantillas/:teamSeasonId" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} /><Route path="/torneos" element={<CompetitionsPage management={competitionManagement} />} /><Route path="/partidos" element={<MatchesPage management={matchManagement} liveManagement={liveMatchManagement} />} /><Route path="/partidos/:matchId" element={<MatchesPage management={matchManagement} liveManagement={liveMatchManagement} />} /><Route path="/torneos/:competitionId/partidos" element={<MatchesPage management={matchManagement} liveManagement={liveMatchManagement} />} /><Route path="/demostracion" element={<Demo />} /><Route path="*" element={<div className="page-heading"><h1>Página no encontrada</h1><Link className="button" to="/">Volver al inicio</Link></div>} /></Routes></main>
     <footer><span>IrukaData <span className="footer-divider">/</span> Gestión local de vóleibol</span><span role="status" className={storage === 'unavailable' ? 'storage-warning' : ''}>{storage === 'ready' ? 'Almacenamiento local disponible' : storage === 'checking' ? 'Comprobando almacenamiento local…' : 'Almacenamiento local no disponible. No se pueden guardar datos.'}</span></footer>
   </div>
 }

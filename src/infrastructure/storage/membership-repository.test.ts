@@ -75,7 +75,7 @@ describe('inscripciones por equipo y temporada', () => {
     const { db, repository } = workspace('iruka-memberships-upgrade')
     expect((await repository.read()).memberships).toEqual([])
     for (const [table, record] of Object.entries(records)) expect(await db.table(table).toArray()).toEqual([record])
-    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '8' })
+    expect(await db.appMetadata.get('schemaVersion')).toEqual({ key: 'schemaVersion', value: '9' })
     expect(await db.appMetadata.get('keep')).toEqual({ key: 'keep', value: 'conservar' })
   })
 
