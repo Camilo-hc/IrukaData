@@ -1,5 +1,5 @@
 import type { TechnicalAction } from '../actions/catalog'
-import type { EventBatch, MatchEvent } from './events'
+import type { EventBatch, MatchEvent, OfficialSubstitutionEvent } from './events'
 import { applyMatchCommand, undoMatchOperation, type MatchCommand, type MatchEngine } from './engine'
 import { POSITIONS } from './lineup'
 
@@ -17,7 +17,7 @@ export interface MatchTimeline {
   readonly effective: readonly AppliedOperation[]
 }
 
-function commandFromEvents(state: MatchEngine, first: MatchEvent): MatchCommand | undefined {
+function commandFromEvents(state: MatchEngine, first: MatchEvent, events: readonly MatchEvent[]): MatchCommand | undefined {
   switch (first.type) {
     case 'set_started': {
       const number = state.sets.length + 1
@@ -40,6 +40,18 @@ function commandFromEvents(state: MatchEngine, first: MatchEvent): MatchCommand 
       if (first.payload.cause.kind === 'manual') {
         return { type: 'award_point', rallyId: first.payload.rallyId, winner: first.payload.winner }
       }
+      return undefined
+    case 'official_substitution':
+      return {
+        type: 'official_substitution', setId: first.setId,
+        selections: events
+          .filter((event): event is OfficialSubstitutionEvent => event.type === 'official_substitution')
+          .map(({ payload: { outgoingId, incomingId } }) => ({ outgoingId, incomingId })),
+      }
+    case 'libero_replacement': {
+      const { outgoingId, incomingId } = first.payload
+      return { type: 'libero_replacement', setId: first.setId, outgoingId, incomingId }
+    }
   }
 }
 
@@ -70,7 +82,7 @@ export function replayTimeline(initial: MatchEngine, log: readonly EventBatch[])
       expectedVersion: batch.expectedVersion,
       timestamp: first.timestamp,
     }
-    const command = commandFromEvents(state, first)
+    const command = commandFromEvents(state, first, batch.events)
     const target = effective.at(-1)
     const result = first.type === 'correction'
       ? target && undoMatchOperation(state, target.before, target.batch, context)
