@@ -173,6 +173,13 @@ button.lineup-slot[aria-pressed="true"] { border-color: #00766b; outline: 2px so
 .live-results { padding-top: .65rem; border-top: 1px solid #c5d8de; }
 .live-results .button { flex-direction: column; }
 .live-result-point { color: #49616d; font-size: .75rem; font-weight: 500; }
+.live-libero-label { color: #07584e; font-size: .75rem; font-weight: 700; }
+.live-bench, .live-change-note, .live-change-count { color: #34525e; font-size: .875rem; }
+.live-changes, .live-change-picker { display: grid; gap: .55rem; }
+.live-changes { padding-top: .75rem; border-top: 1px solid #c5d8de; }
+.live-change-controls, .live-change-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.live-change-controls .button { flex-direction: column; }
+.live-group-toggle { justify-self: start; min-height: 44px; }
 .live-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .55rem; }
 .live-controls .button { min-height: 48px; }
 .live-side-change { padding: .75rem; color: #384005; background: #f2f7d3; border-left: 3px solid #839127; }

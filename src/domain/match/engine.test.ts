@@ -4,13 +4,14 @@ import { DEFAULT_RULES_INPUT, validateRules } from '../rules/configuration'
 import type { Id, Side } from '../shared/types'
 import type { MatchRoster, MatchSet, Rally } from './contracts'
 import type { EventBatch } from './events'
-import { applyMatchCommand, createMatchEngine, currentSet, decidingSideChangeReached, targetRallyId, type MatchCommand } from './engine'
+import { applyMatchCommand, createMatchEngine, currentSet, decidingSideChangeReached, targetRallyId, undoMatchOperation, type MatchCommand } from './engine'
 import { POSITIONS } from './lineup'
+import { liberoReturnRequired } from './player-changes'
 import { replayMatch } from './replay'
 
 const matchId = 'match-1' as Id<'Match'>
 const outsiderMatchId = 'match-2' as Id<'Match'>
-const roster: MatchRoster[] = Array.from({ length: 10 }, (_, index) => ({
+const roster: MatchRoster[] = Array.from({ length: 13 }, (_, index) => ({
   id: `player-${index + 1}` as MatchRoster['id'],
   matchId: index === 8 ? outsiderMatchId : matchId,
   athleteId: `athlete-${index + 1}` as Id<'Athlete'>,
@@ -18,13 +19,13 @@ const roster: MatchRoster[] = Array.from({ length: 10 }, (_, index) => ({
   nameSnapshot: `Deportista ${index + 1}`,
   jerseyNumberSnapshot: index + 1,
   calledUp: index !== 9,
-  designatedLibero: index === 7,
+  designatedLibero: index === 7 || index === 10,
 }))
 const regularOrder = POSITIONS.map((position, index) => ({ position, playerId: roster[index]!.id }))
 const newOrder = POSITIONS.map((position, index) => ({ position, playerId: roster[6 - index]!.id }))
 
-function setup(decidingSideChange = true) {
-  const rules = validateRules({ ...DEFAULT_RULES_INPUT, decidingSideChange })
+function setup(decidingSideChange = true, substitutionLimit = '6') {
+  const rules = validateRules({ ...DEFAULT_RULES_INPUT, decidingSideChange, substitutionLimit })
   if (!rules.ok) throw new Error('Las reglas de prueba deben ser válidas.')
   const initial = createMatchEngine({ id: matchId, version: 3, rulesSnapshot: rules.value }, roster)
   let state = initial
@@ -65,7 +66,7 @@ function setup(decidingSideChange = true) {
   }
 
   return {
-    initial, log, newContext, run, start, rallyId,
+    initial, log, newContext, run, start, rallyId, succeed,
     state: () => state,
     progress: () => currentSet(state)!,
     action: (number: number, action: TechnicalAction) =>
@@ -281,5 +282,107 @@ describe('motor puro de partido', () => {
     expect(replayMatch(fixture.initial, [start!, reception!, truncated, manual!])).toMatchObject({ status: 'invalid_log', batchNumber: 3 })
     expect(replayMatch(fixture.initial, [start!, reception!, reception!])).toMatchObject({ status: 'invalid_log', batchNumber: 3 })
     expect(replayMatch(fixture.initial, [start!, terminal!, reception!])).toMatchObject({ status: 'invalid_log', batchNumber: 2 })
+  })
+})
+
+function change(outgoing: number, incoming: number) {
+  return { outgoingId: roster[outgoing - 1]!.id, incomingId: roster[incoming - 1]!.id }
+}
+
+describe('cambios de posiciones en cancha', () => {
+  it('aplica una solicitud oficial como un lote atómico y cuenta cada pareja contra el cupo', () => {
+    const fixture = setup(true, '3')
+    fixture.start(1, 'opponent')
+    const before = fixture.state()
+    const request = { type: 'official_substitution', setId: fixture.progress().set.id } as const
+    expect(fixture.run({ ...request, selections: [change(2, 7), change(5, 7)] })).toMatchObject({ code: 'invalid_change' })
+    expect(fixture.run({ ...request, selections: [change(2, 7), change(2, 12)] })).toMatchObject({ code: 'invalid_change' })
+    expect(fixture.run({ ...request, selections: [change(2, 8)] })).toMatchObject({ code: 'invalid_change' })
+    expect(fixture.state()).toBe(before)
+    const batch = fixture.succeed({ ...request, selections: [change(2, 7), change(5, 12)] })
+    expect(batch.events).toMatchObject([
+      { sequence: 2, type: 'official_substitution', payload: { ...change(2, 7), slotId: 2, position: 2, scoreBefore: { own: 0, opponent: 0 } } },
+      { sequence: 3, type: 'official_substitution', payload: { ...change(5, 12), slotId: 5, position: 5, scoreBefore: { own: 0, opponent: 0 } } },
+    ])
+    expect(fixture.progress()).toMatchObject({ score: { own: 0, opponent: 0 }, completedRallies: 0, serving: 'opponent', changes: { officialCount: 2 } })
+    expect(fixture.run({ ...request, selections: [change(3, 13)] })).toMatchObject({ message: /completarse una jugada/ })
+    fixture.point('own')
+    expect(fixture.progress().rotation[1]).toMatchObject({ slotId: 2, startingPlayerId: roster[1]!.id, rotationOwnerId: roster[6]!.id })
+    expect(fixture.run({ ...request, selections: [change(7, 2), change(12, 5)] })).toMatchObject({ message: /supera el cupo/ })
+    expect(fixture.run({ ...request, selections: [change(7, 13)] })).toMatchObject({ message: /titular original/ })
+    fixture.succeed({ ...request, selections: [change(7, 2)] })
+    expect(fixture.progress().rotation[1]).toMatchObject({ slotId: 2, rotationOwnerId: roster[1]!.id, courtOccupantId: roster[1]!.id })
+    expect(fixture.progress().changes.officialCount).toBe(3)
+    for (let i = 1; i < 25; i += 1) fixture.point('own')
+    expect(fixture.run({ ...request, selections: [change(12, 5)] })).toMatchObject({ code: 'invalid_phase' })
+    fixture.start(2, 'opponent')
+    expect(fixture.progress().changes).toMatchObject({ officialCount: 0, substitutionPartners: {}, activeLibero: null })
+    expect(fixture.run({ ...request, selections: [change(2, 7)] })).toMatchObject({ code: 'invalid_set' })
+    expect(fixture.run({ ...request, setId: fixture.progress().set.id, selections: [change(2, 7)] }).status).toBe('applied')
+    expect(replayMatch(fixture.initial, fixture.log)).toEqual({ status: 'replayed', state: fixture.state() })
+  })
+
+  it('retiene el vínculo de la pareja oficial tras el retorno y rechaza una segunda entrada o salida', () => {
+    const fixture = setup(true, '8')
+    fixture.start(1, 'own')
+    const request = { type: 'official_substitution', setId: fixture.progress().set.id } as const
+    fixture.succeed({ ...request, selections: [change(2, 7)] })
+    fixture.action(1, { action: 'serve', result: 'en_juego' })
+    expect(fixture.run({ ...request, selections: [change(7, 2)] })).toMatchObject({ message: /Termina la jugada/ })
+    fixture.point('own')
+    fixture.succeed({ ...request, selections: [change(7, 2)] })
+    fixture.point('own')
+    expect(fixture.run({ ...request, selections: [change(3, 7)] })).toMatchObject({ code: 'invalid_change' })
+    expect(fixture.run({ ...request, selections: [change(2, 12)] })).toMatchObject({ code: 'invalid_change' })
+    expect(fixture.progress().changes.officialCount).toBe(2)
+  })
+
+  it('exige que el regular retorne al llegar el líbero a la delantera y conserva los vínculos al alternar designados', () => {
+    const fixture = setup()
+    fixture.start(1, 'opponent')
+    const setId = fixture.progress().set.id
+    const replace = (outgoing: number, incoming: number) =>
+      fixture.run({ type: 'libero_replacement', setId, ...change(outgoing, incoming) })
+    const serving = fixture.progress().serving
+    expect(replace(2, 8)).toMatchObject({ code: 'invalid_change' })
+    expect(replace(5, 7)).toMatchObject({ code: 'invalid_change' })
+    expect(replace(5, 8)).toMatchObject({
+      status: 'applied', batch: { events: [{ payload: { ...change(5, 8), direction: 'enter', regularPlayerId: roster[4]!.id, completedRalliesBefore: 0 } }] },
+    })
+    expect(fixture.progress()).toMatchObject({ score: { own: 0, opponent: 0 }, serving, rotation: { 5: { slotId: 5, rotationOwnerId: roster[4]!.id, courtOccupantId: roster[7]!.id } } })
+    expect(replace(8, 5)).toMatchObject({ message: /completarse una jugada/ })
+    expect(fixture.run({ type: 'official_substitution', setId, selections: [change(8, 7)] })).toMatchObject({ message: /regular vinculado/ })
+    expect(fixture.run({ type: 'record_action', rallyId: fixture.rallyId(), playerId: roster[7]!.id, action: { action: 'block', result: 'punto' } })).toMatchObject({ code: 'invalid_libero_action' })
+    fixture.action(8, { action: 'dig', result: 'controlada' })
+    expect(replace(8, 5)).toMatchObject({ message: /Termina la jugada/ })
+    fixture.point('own')
+    expect(fixture.progress().rotation[4]).toMatchObject({ slotId: 5, courtOccupantId: roster[7]!.id })
+    expect(liberoReturnRequired(fixture.progress())).toBe(true)
+    expect(fixture.run({ type: 'award_point', winner: 'opponent', rallyId: fixture.rallyId() })).toMatchObject({ code: 'libero_return_required' })
+    expect(replace(8, 11)).toMatchObject({ code: 'invalid_change' })
+    expect(replace(8, 7)).toMatchObject({ code: 'invalid_change' })
+    expect(replace(8, 5)).toMatchObject({ status: 'applied', batch: { events: [{ payload: { direction: 'return', slotId: 5, position: 4 } }] } })
+    expect(liberoReturnRequired(fixture.progress())).toBe(false)
+    expect(replace(6, 11)).toMatchObject({ message: /completarse una jugada/ })
+    fixture.point('opponent')
+    expect(replace(6, 11)).toMatchObject({ status: 'applied' })
+    fixture.point('opponent')
+    expect(replace(1, 8)).toMatchObject({ code: 'invalid_change' })
+    expect(replace(11, 8)).toMatchObject({ status: 'applied', batch: { events: [{ payload: { direction: 'libero_to_libero', slotId: 6, position: 5, regularPlayerId: roster[5]!.id } }] } })
+    expect(fixture.progress()).toMatchObject({ score: { own: 1, opponent: 2 }, changes: { officialCount: 0, activeLibero: { liberoId: roster[7]!.id, regularPlayerId: roster[5]!.id } } })
+    expect(replayMatch(fixture.initial, fixture.log)).toEqual({ status: 'replayed', state: fixture.state() })
+  })
+
+  it('deshace toda una solicitud oficial y vuelve a habilitar sus parejas y su cupo', () => {
+    const fixture = setup()
+    fixture.start(1, 'own')
+    const before = fixture.state()
+    const request = { type: 'official_substitution', setId: fixture.progress().set.id, selections: [change(2, 7), change(3, 12)] } as const
+    const batch = fixture.succeed(request)
+    const undo = undoMatchOperation(fixture.state(), before, batch, fixture.newContext())
+    if (undo.status !== 'applied') throw new Error('Se esperaba deshacer la solicitud.')
+    expect(currentSet(undo.state)).toEqual(currentSet(before))
+    expect(replayMatch(fixture.initial, [...fixture.log, undo.batch])).toEqual({ status: 'replayed', state: undo.state })
+    expect(applyMatchCommand(undo.state, request, fixture.newContext(undo.state.version)).status).toBe('applied')
   })
 })

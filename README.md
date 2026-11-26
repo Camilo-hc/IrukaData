@@ -4,7 +4,7 @@ IrukaData es una aplicación en desarrollo para gestionar equipos de vóleibol y
 
 El proyecto prioriza el funcionamiento local y sin conexión, una interfaz en español y controles adecuados para notebook y tablet. Su objetivo es reunir acciones técnicas, marcador, rotaciones, sustituciones oficiales y reemplazos de líbero en un mismo panel de partido.
 
-**Estado actual:** la aplicación permite configurar un club, gestionar equipos y temporadas, mantener perfiles de deportistas e inscribirlos en distintas plantillas con dorsales independientes. El Hito 1 está implementado. El Hito 2 permite gestionar torneos, programar partidos, guardar sus convocatorias y preparar el primer set con seis titulares y el equipo al saque. El Hito 4 conecta el motor al panel en vivo para registrar acciones y puntos, deshacer el último registro y continuar el partido sin conexión.
+**Estado actual:** la aplicación permite configurar un club, gestionar equipos y temporadas, mantener perfiles de deportistas e inscribirlos en distintas plantillas con dorsales independientes. También permite gestionar torneos y preparar partidos con su convocatoria, alineación inicial y servicio. Desde el panel en vivo se registran acciones, puntos, sustituciones oficiales y reemplazos de líbero, con guardado automático y reanudación sin conexión.
 
 ## Objetivos
 
@@ -21,14 +21,10 @@ Las siguientes funcionalidades forman parte del alcance previsto y **todavía no
 
 | Área | Alcance previsto |
 | --- | --- |
-| Sustituciones oficiales | Validación de elegibilidad, límites por set y reingresos según el perfil del torneo, con registro de entradas y salidas. |
-| Reemplazos de líbero | Registro separado de las sustituciones oficiales, vínculo con el jugador regular reemplazado y control de la ocupación de cancha sin alterar el orden reglamentario. |
 | Estadísticas e historial | Métricas individuales y de equipo derivadas de las acciones registradas, con filtros por partido, set, torneo, categoría y temporada. |
 | Respaldos | Exportación e importación de los datos locales para recuperar el historial. |
 
-En el panel en vivo ya se registran acciones y puntos **sin navegar a otra pantalla**. Las sustituciones oficiales y los reemplazos de líbero se incorporarán al mismo panel. Los límites y condiciones de los cambios dependerán de las reglas configuradas para cada torneo.
-
-El registro individual se limitará a los jugadores del propio club. El rival se identificará por su nombre, marcador y equipo al servicio, sin estadísticas individuales de sus jugadores.
+El registro individual cubre a los jugadores del propio club. El rival se identifica por su nombre, marcador y equipo al servicio.
 
 ## Funcionalidades implementadas
 
@@ -56,7 +52,9 @@ El registro individual se limitará a los jugadores del propio club. El rival se
 - Motor de partido independiente de React e IndexedDB. Aplica el catálogo de acciones y los puntos manuales, conserva o transfiere el servicio, rota al recuperar el saque propio y cierra sets y partidos al mejor de tres.
 - Lotes de eventos que permiten reconstruir el estado del motor. Cada comando verifica la versión del partido y, al puntuar, la jugada vigente. IndexedDB guarda cada lote junto al cambio de fase y al estado del set en la misma transacción.
 - Panel táctil con marcador, sets ganados, equipo al saque, posiciones propias en cancha, acciones y resultados, puntos manuales y últimos registros. Se accede con «Iniciar anotación» en la ficha de un partido listo para el saque.
-- Reanudación después de recargar o cerrar la ficha, incluso con una jugada abierta. «Deshacer» registra una corrección y restaura el marcador, el saque, la rotación y la fase previos. El inicio del primer set se conserva.
+- «Cambio oficial» y «Reemplazo de líbero» en la ficha del partido. Selecciona a quien sale en la cancha y elige entre los entrantes elegibles. Puedes agrupar varias parejas de cambio oficial en una sola solicitud. Entre solicitudes separadas del mismo tipo debe completarse una jugada.
+- Cupo de cambios oficiales por set, pareja titular–suplente y reingreso a la casilla original de la alineación. Los reemplazos de líbero conservan a la persona regular vinculada y se registran fuera del cupo oficial. Si la rotación lleva a la líbero a la delantera, el panel pide registrar el retorno antes de continuar.
+- Reanudación después de recargar o cerrar la ficha, incluso con una jugada abierta. «Deshacer» registra una corrección y restaura el estado previo, incluida la ocupación de cancha y el cupo de sustituciones. El inicio del primer set se conserva.
 - Alineación y servicio independientes para cada set. Entre sets puedes armar una alineación nueva o editar una copia de la anterior. Si corresponde, el panel avisa el cambio de lado al llegar al umbral del tercer set.
 - Demostración estática de solo lectura con nombres y equipos ficticios; sus datos no se insertan en la base del club.
 - Estructura modular que separa dominio, estadísticas, aplicación, almacenamiento e interfaz.
@@ -65,11 +63,11 @@ El registro individual se limitará a los jugadores del propio club. El rival se
 - Manifiesto, iconos y caché PWA para cargar los recursos compilados sin conexión después de su preparación inicial, sin forzar la activación de nuevas versiones durante una sesión abierta.
 - Configuración de TypeScript estricto, lint, pruebas unitarias, pruebas de componentes, pruebas de navegador e integración continua.
 
-La aplicación permite preparar partidos y registrar su desarrollo. Las sustituciones, los reemplazos de líbero, las estadísticas y los respaldos se incorporarán en etapas posteriores. Los perfiles no contienen dorsal: este pertenece a cada inscripción. La convocatoria conserva el dorsal y el nombre guardados para el partido aunque cambie el perfil o la inscripción.
+El dorsal pertenece a cada inscripción. La convocatoria conserva el dorsal y el nombre guardados para el partido aunque cambie el perfil o la inscripción.
 
 Archivar un perfil, equipo o temporada conserva sus inscripciones. Una inscripción activa sigue reservando su dorsal hasta archivarla explícitamente. El rol habitual de líbero no constituye una designación de líbero para un partido.
 
-Archivar un torneo conserva sus participaciones. Archivar un equipo o desvincular su temporada no retira automáticamente sus participaciones existentes; pueden conservarse o retirarse al editar el torneo. Añadir o recuperar una participación exige un equipo y asociación activos de la misma temporada. Con la temporada archivada, el torneo se puede consultar y archivar; para editarlo o restaurarlo hay que reactivar la temporada. El tipo de competición es descriptivo y no determina reglas automáticamente. Cada partido guarda su propia configuración; no se infiere un perfil por categoría ni se afirma compatibilidad completa con FIVB. Las sustituciones, los reemplazos y sus excepciones todavía no se ejecutan.
+Archivar un torneo conserva sus participaciones. Archivar un equipo o desvincular su temporada no retira automáticamente sus participaciones existentes; pueden conservarse o retirarse al editar el torneo. Añadir o recuperar una participación exige un equipo y asociación activos de la misma temporada. Con la temporada archivada, el torneo se puede consultar y archivar; para editarlo o restaurarlo hay que reactivar la temporada. El tipo de competición es descriptivo. Cada partido guarda su propio cupo y requisitos de designación. El panel aplica las reglas ordinarias de sustitución y reemplazo. Las excepciones arbitrales, como la sustitución excepcional por lesión y la redesignación de una líbero, quedan fuera del alcance actual.
 
 Los partidos requieren una participación, torneo, equipo, asociación y temporada activos para crearse, editarse o restaurarse. Archivar o retirar una referencia conserva los partidos existentes y permite consultar y archivar sus borradores. La fecha y hora se guardan como hora local de la sede, tal como se ingresan, sin conversión automática de zona horaria. Se permiten varios encuentros con el mismo rival y horario; no se confunden por esos datos.
 
@@ -82,7 +80,7 @@ Los partidos requieren una participación, torneo, equipo, asociación y tempora
 | Hito 2 — Torneos, partidos y alineación | Competiciones, creación de partidos, convocatoria, seis titulares por posición y designación de líberos. | Implementado hasta la preparación del primer set |
 | Hito 3 — Motor puro de partido | Estados de partido y jugada, puntuación, servicio, rotaciones y cierre de sets y partidos. | Motor implementado y probado como módulo |
 | Hito 4 — Panel de anotación en vivo | Interfaz táctil para acciones y puntos, eventos recientes, deshacer, guardado automático y reanudación. | Implementado |
-| Hito 5 — Cambios oficiales y reemplazos de líbero | Flujos de cambio dentro del panel, validación de elegibilidad y reingresos, límites configurables y seguimiento del vínculo líbero–jugador regular. | Planificado |
+| Hito 5 — Cambios oficiales y reemplazos de líbero | Flujos de cambio dentro del panel, validación de elegibilidad y reingresos, límites configurables y seguimiento del vínculo líbero–jugador regular. | Implementado |
 | Hito 6 — Estadísticas, historial y respaldo | Estadísticas derivadas de eventos, filtros, consulta del historial y exportación/importación de respaldos. | Planificado |
 | Hito 7 — Calidad y lanzamiento del MVP | Validación de partidos completos offline, accesibilidad táctil, pulsaciones repetidas, recuperación, restauración de respaldos y preparación para uso real. | Planificado |
 
