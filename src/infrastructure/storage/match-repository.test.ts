@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMatchManagement } from '../../application/matches/service'
 import { createClubManagement } from '../../application/club/service'
 import { createCompetitionManagement } from '../../application/competitions/service'
+import type { BackupDocument } from '../../application/backup/contracts'
+import { createBackupManagement } from '../../application/backup/service'
 import { DEFAULT_RULES_INPUT, rulesToInput, validateRules } from '../../domain/rules/configuration'
 import type { Match } from '../../domain/match/contracts'
 import type { CallUpSelection } from '../../domain/match/call-up'
@@ -15,6 +17,7 @@ import { DexieCompetitionRepository } from './competition-repository'
 import { DexieMatchRepository } from './match-repository'
 import { IrukaDatabase } from './database'
 import { DexieLiveMatchRepository } from './live-match-repository'
+import { DexieBackupRepository } from './backup-repository'
 
 const databases: IrukaDatabase[] = []
 let sequence = 0
@@ -470,5 +473,68 @@ describe('anotación en vivo en IndexedDB', () => {
     expect(view.match.phase).toBe('FIN_SET')
     expect(await db.matchSets.get({ matchId, number: 2 })).toBeUndefined()
     expect(await db.matchSets.get({ matchId, number: 1 })).toMatchObject({ status: 'finished', finalScore: { own: 25, opponent: 0 } })
+  })
+})
+
+function backupFor(db: IrukaDatabase) {
+  return createBackupManagement(new DexieBackupRepository(db), () => '2026-11-26T18:30:00.000Z')
+}
+
+describe('respaldo de partidos y datos del club', () => {
+  it('restaura un partido abierto con sus correcciones y reconstruye los índices locales', async () => {
+    const { db, dispatch, matchId, input } = await preparedLive()
+    const started = await dispatch({ type: 'begin_match' })
+    if (started.status !== 'started') throw new Error('No se abrió el partido.')
+    const rallyId = targetRallyId(started.engine)!
+    const playerId = input.starters[0]!.playerId
+    await dispatch({ type: 'record_action', playerId, rallyId, action: { action: 'reception', result: 'perfecta' } })
+    await dispatch({ type: 'record_action', playerId, rallyId, action: { action: 'attack', result: 'punto' } })
+    const corrected = await dispatch({ type: 'undo' })
+    const source = await backupFor(db).exportBackup()
+    const destination = workspace().db
+    await destination.appMetadata.put({ key: 'keep', value: 'conservar' })
+    const importer = backupFor(destination)
+    const preview = await importer.preview(source.text)
+    expect(preview.current.matches).toBe(0)
+    expect(preview.incoming).toMatchObject({ matches: 1, sets: 1, events: 5 })
+    expect(await destination.matches.count()).toBe(0)
+    expect(await preview.restore()).toBe('restored')
+    expect(await new DexieLiveMatchRepository(destination).read(matchId)).toEqual(corrected)
+    expect(JSON.parse((await importer.exportBackup()).text)).toEqual(JSON.parse(source.text))
+    expect((await destination.memberships.toArray())[0]?.activeJerseyNumber).toBeGreaterThan(0)
+    expect(await destination.appMetadata.get('keep')).toEqual({ key: 'keep', value: 'conservar' })
+  })
+
+  it('rechaza formatos, referencias y eventos alterados antes de permitir restaurar', async () => {
+    const { db, dispatch } = await preparedLive()
+    await dispatch({ type: 'begin_match' })
+    const backup = backupFor(db)
+    const source: BackupDocument = JSON.parse((await backup.exportBackup()).text)
+    await expect(backup.preview('{"no termina"')).rejects.toThrow(/JSON válido/)
+    await expect(backup.preview(JSON.stringify({ ...source, version: 2 }))).rejects.toThrow(/versión/)
+    await expect(backup.preview(JSON.stringify({ ...source, data: { ...source.data, memberships: [] } }))).rejects.toThrow(/convocatoria/)
+    const batches = source.data.liveBatches.map((batch) => ({
+      ...batch, events: batch.events.map((event) => ({ ...event, sequence: event.sequence + 1 })),
+    }))
+    await expect(backup.preview(JSON.stringify({ ...source, data: { ...source.data, liveBatches: batches } }))).rejects.toThrow(/historial no se pudo/)
+    expect(JSON.parse((await backup.exportBackup()).text)).toEqual(source)
+  })
+
+  it('detecta escrituras después de la vista previa y revierte una restauración interrumpida', async () => {
+    const { db, dispatch } = await preparedLive()
+    await dispatch({ type: 'begin_match' })
+    const source = await backupFor(db).exportBackup()
+    const destination = workspace()
+    await destination.clubManagement.saveClub('Datos locales', null)
+    const importer = backupFor(destination.db)
+    const oldPreview = await importer.preview(source.text)
+    const current = (await destination.repository.read()).club!
+    await destination.clubManagement.saveClub('Datos editados', current)
+    expect(await oldPreview.restore()).toBe('changed')
+    const backupBefore = await importer.exportBackup()
+    const fresh = await importer.preview(source.text)
+    vi.spyOn(destination.db.matchSets, 'bulkAdd').mockRejectedValueOnce(new Error('Cuota agotada'))
+    expect(await fresh.restore()).toBe('failed')
+    expect((await importer.exportBackup()).text).toBe(backupBefore.text)
   })
 })

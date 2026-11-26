@@ -1,6 +1,8 @@
 import type { TechnicalAction } from '../actions/catalog'
+import { canonicalJson } from '../shared/canonical-json'
 import type { EventBatch, MatchEvent, OfficialSubstitutionEvent } from './events'
-import { applyMatchCommand, undoMatchOperation, type MatchCommand, type MatchEngine } from './engine'
+import type { Match, MatchRoster } from './contracts'
+import { applyMatchCommand, createMatchEngine, undoMatchOperation, type MatchCommand, type MatchEngine } from './engine'
 import { POSITIONS } from './lineup'
 
 type ReplayResult =
@@ -15,6 +17,14 @@ interface AppliedOperation {
 export interface MatchTimeline {
   readonly state: MatchEngine
   readonly effective: readonly AppliedOperation[]
+}
+
+export function reconstructMatch(match: Match, roster: readonly MatchRoster[], initialVersion: number, log: readonly EventBatch[]): MatchTimeline {
+  const result = replayTimeline(createMatchEngine({ ...match, version: initialVersion }, roster), log)
+  if (result.status !== 'replayed' || !result.state.sets.length || result.state.version !== match.version || result.state.phase !== match.phase) {
+    throw new Error('El historial local no reproduce el estado del partido.')
+  }
+  return result
 }
 
 function commandFromEvents(state: MatchEngine, first: MatchEvent, events: readonly MatchEvent[]): MatchCommand | undefined {
@@ -55,14 +65,6 @@ function commandFromEvents(state: MatchEngine, first: MatchEvent, events: readon
   }
 }
 
-// IndexedDB y los respaldos pueden entregar claves en órdenes distintos.
-function comparableJson(value: unknown): string {
-  return JSON.stringify(value, (_key, item: unknown) => {
-    if (item === null || typeof item !== 'object' || Array.isArray(item)) return item
-    return Object.fromEntries(Object.keys(item).sort().map((key) => [key, (item as Record<string, unknown>)[key]]))
-  })
-}
-
 /** Reconstruye desde la versión inicial del partido y sus lotes, en orden. */
 export function replayMatch(initial: MatchEngine, log: readonly EventBatch[]): ReplayResult {
   const result = replayTimeline(initial, log)
@@ -90,7 +92,7 @@ export function replayTimeline(initial: MatchEngine, log: readonly EventBatch[])
     if (!result) {
       return { status: 'invalid_log', batchNumber: index + 1, message: 'El lote comienza con un evento no admitido por el motor.' }
     }
-    if (result.status !== 'applied' || comparableJson(result.batch.events) !== comparableJson(batch.events)) {
+    if (result.status !== 'applied' || canonicalJson(result.batch.events) !== canonicalJson(batch.events)) {
       return { status: 'invalid_log', batchNumber: index + 1, message: 'La secuencia o el resultado del lote no coincide con el estado del partido.' }
     }
     if (first.type === 'correction') effective.pop()

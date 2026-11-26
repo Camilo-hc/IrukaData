@@ -1,15 +1,15 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { LiveCommand, LiveResult, LiveView } from '../../application/live/ports'
-import { ACTION_CATALOG, technicalResult, type TechnicalAction } from '../../domain/actions/catalog'
+import { ACTION_CATALOG, type TechnicalAction } from '../../domain/actions/catalog'
 import type { MatchRoster, MatchSet } from '../../domain/match/contracts'
 import { currentSet, decidingSideChangeReached, targetRallyId } from '../../domain/match/engine'
-import type { MatchEvent } from '../../domain/match/events'
 import { COURT_POSITIONS } from '../../domain/match/lineup'
 import { liberoReturnRequired } from '../../domain/match/player-changes'
 import type { Side } from '../../domain/shared/types'
 import { LineupEditor } from './LineupPanel'
 import { LivePlayerChanges } from './LivePlayerChanges'
-import { MATCH_PHASES, matchPlayerLabel } from './labels'
+import { MATCH_PHASES, matchEventLabel, matchPlayerLabel } from './labels'
 
 type Action = keyof typeof ACTION_CATALOG
 
@@ -193,37 +193,13 @@ export function LiveMatchBoard({ view, ownName, busy, message, dispatch }: Props
       </div>}
     </section>}
     <section className="live-panel" aria-labelledby="live-recent-title">
-      <h3 id="live-recent-title">Últimos registros</h3>
+      <div className="section-heading">
+        <h3 id="live-recent-title">Últimos registros</h3>
+        <Link className="text-link" to={'/historial/' + encodeURIComponent(view.match.id)}>Ver historial completo</Link>
+      </div>
       <ul className="live-history" aria-label="Últimos registros">
-        {recent.map((event) => <li key={event.id}>{eventLabel(event, players, teams, engine.sets.map(({ set }) => set))}</li>)}
+        {recent.map((event) => <li key={event.id}>{matchEventLabel(event, players, teams, engine.sets.map(({ set }) => set))}</li>)}
       </ul>
     </section>
   </section>
-}
-
-function eventLabel(event: MatchEvent, players: ReadonlyMap<MatchRoster['id'], MatchRoster>, teams: Record<Side, string>, sets: readonly MatchSet[]) {
-  const set = sets.find((item) => item.id === event.setId)
-  switch (event.type) {
-    case 'technical_action': {
-      const player = players.get(event.payload.playerId)
-      const name = matchPlayerLabel(player)
-      return `${name} · ${ACTION_CATALOG[event.payload.action].label} · ${technicalResult(event.payload)?.label}`
-    }
-    case 'point_awarded':
-      return `Punto para ${teams[event.payload.winner]}${event.payload.cause.kind === 'manual' ? ' · Manual' : ''}`
-    case 'set_started':
-      return `Inicio del set ${set?.number} · Saque de ${teams[event.payload.initialService]}`
-    case 'set_finished':
-      return `Fin del set ${set?.number} · ${event.payload.finalScore.own}–${event.payload.finalScore.opponent}`
-    case 'correction':
-      return 'Último registro deshecho'
-    case 'official_substitution':
-    case 'libero_replacement': {
-      const type = event.type === 'official_substitution' ? 'Sustitución oficial' : 'Reemplazo de líbero'
-      const { outgoingId, incomingId, position, scoreBefore } = event.payload
-      const outgoing = players.get(outgoingId)
-      const incoming = players.get(incomingId)
-      return `${type} · Sale ${matchPlayerLabel(outgoing)} · Entra ${matchPlayerLabel(incoming)} · Set ${set?.number}, ${scoreBefore.own}–${scoreBefore.opponent}, posición ${position}`
-    }
-  }
 }
