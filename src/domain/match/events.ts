@@ -13,9 +13,12 @@ interface EventEnvelope {
 }
 type Event<K extends string, P> = EventEnvelope & Readonly<{ type: K; payload: P }>
 
-interface PlayerChange {
+export interface PlayerChangeSelection {
   readonly outgoingId: MatchRoster['id']
   readonly incomingId: MatchRoster['id']
+}
+
+interface PlayerChange extends PlayerChangeSelection {
   readonly slotId: Position
   readonly position: Position
   readonly scoreBefore: Score
@@ -43,3 +46,6 @@ export interface EventBatch {
   readonly expectedVersion: number
   readonly events: readonly MatchEvent[]
 }
+
+export type OfficialSubstitutionEvent = Extract<MatchEvent, { type: 'official_substitution' }>
+export type LiberoReplacementEvent = Extract<MatchEvent, { type: 'libero_replacement' }>

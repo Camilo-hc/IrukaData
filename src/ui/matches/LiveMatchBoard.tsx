@@ -5,9 +5,11 @@ import type { MatchRoster, MatchSet } from '../../domain/match/contracts'
 import { currentSet, decidingSideChangeReached, targetRallyId } from '../../domain/match/engine'
 import type { MatchEvent } from '../../domain/match/events'
 import { COURT_POSITIONS } from '../../domain/match/lineup'
+import { liberoReturnRequired } from '../../domain/match/player-changes'
 import type { Side } from '../../domain/shared/types'
 import { LineupEditor } from './LineupPanel'
-import { MATCH_PHASES } from './labels'
+import { LivePlayerChanges } from './LivePlayerChanges'
+import { MATCH_PHASES, matchPlayerLabel } from './labels'
 
 type Action = keyof typeof ACTION_CATALOG
 
@@ -30,18 +32,25 @@ export function LiveMatchBoard({ view, ownName, busy, message, dispatch }: Props
   if (!progress) return <p role="alert">El partido todavía no tiene un set abierto.</p>
 
   const players = new Map(engine.roster.map((player) => [player.id, player]))
-  const selected = playerId ? players.get(playerId) : undefined
+  const slots = Object.values(progress.rotation)
+  const selected = playerId && slots.some((slot) => slot.courtOccupantId === playerId) ? players.get(playerId) : undefined
+  const bench = engine.roster.filter((player) => !player.designatedLibero && !slots.some((slot) => slot.rotationOwnerId === player.id))
+  const restingLiberos = engine.roster.filter((player) => player.designatedLibero && player.id !== progress.changes.activeLibero?.liberoId)
+  const needsLiberoReturn = liberoReturnRequired(progress)
   const rallyId = targetRallyId(engine)
-  const canServe = progress.serving === 'own' && progress.rotation[1].courtOccupantId === playerId && engine.phase !== 'JUGADA_EN_CURSO'
-  const entries = action && (action !== 'serve' || canServe) ? Object.entries(ACTION_CATALOG[action].results) : []
+  const canServe = selected && !selected.designatedLibero && progress.serving === 'own' &&
+    progress.rotation[1].courtOccupantId === selected.id && engine.phase !== 'JUGADA_EN_CURSO'
+  const entries = selected && action && (action !== 'serve' || canServe)
+    ? Object.entries(ACTION_CATALOG[action].results).filter(([key]) => !selected.designatedLibero || action !== 'block' || key === 'falta')
+    : []
   const preparing = engine.phase === 'FIN_SET' && editor?.setId === progress.set.id
   const nextNumber = progress.set.number + 1
-  const active = rallyId !== null && !busy
+  const active = rallyId !== null && !busy && !needsLiberoReturn
   const finishedSets = engine.sets.filter(({ set }) => set.status === 'finished')
 
   async function record(result: string) {
-    if (!active || !rallyId || !playerId || !action) return
-    const saved = await dispatch({ type: 'record_action', rallyId, playerId, action: { action, result } as TechnicalAction })
+    if (!active || !rallyId || !selected || !action) return
+    const saved = await dispatch({ type: 'record_action', rallyId, playerId: selected.id, action: { action, result } as TechnicalAction })
     if (saved.ok) selectAction(null)
   }
 
@@ -70,6 +79,7 @@ export function LiveMatchBoard({ view, ownName, busy, message, dispatch }: Props
     </div>
     {message && !preparing && <p role="alert" className="form-error">{message}</p>}
     {rallyId && decidingSideChangeReached(engine) && <p className="live-side-change" role="status">Cambio de lado del tercer set. Mantén el orden de rotación.</p>}
+    {needsLiberoReturn && <p className="live-side-change" role="status">Selecciona al líbero en cancha y registra el retorno del deportista regular antes de la siguiente jugada.</p>}
     {finishedSets.length > 0 && <ul className="live-set-results" aria-label="Resultados por set">
       {finishedSets.map(({ set, score }) =>
         <li key={set.id}>Set {set.number} <strong>{score.own}–{score.opponent}</strong></li>)}
@@ -94,7 +104,9 @@ export function LiveMatchBoard({ view, ownName, busy, message, dispatch }: Props
         <div className="lineup-court" role="group" aria-label="Posiciones en cancha">
           <p className="lineup-net">Red</p>
           {COURT_POSITIONS.map((position) => {
-            const player = players.get(progress.rotation[position].courtOccupantId)
+            const slot = progress.rotation[position]
+            const player = players.get(slot.courtOccupantId)
+            const regular = player?.designatedLibero ? players.get(slot.rotationOwnerId) : undefined
             return <button
               key={position}
               type="button"
@@ -110,19 +122,22 @@ export function LiveMatchBoard({ view, ownName, busy, message, dispatch }: Props
               <span>Posición {position}</span>
               <strong className="jersey">#{player?.jerseyNumberSnapshot}</strong>
               <span>{player?.nameSnapshot}</span>
+              {regular && <span className="live-libero-label">Líbero por #{regular.jerseyNumberSnapshot}</span>}
             </button>
           })}
         </div>
+        {bench.length > 0 && <p className="live-bench"><strong>Banca</strong> {bench.map((player) => `#${player.jerseyNumberSnapshot}`).join(' · ')}</p>}
+        {restingLiberos.length > 0 && <p className="live-bench"><strong>Líberos fuera de cancha</strong> {restingLiberos.map((player) => `#${player.jerseyNumberSnapshot}`).join(' · ')}</p>}
       </section>
       <section className="live-panel" aria-labelledby="live-actions-title">
         <h3 id="live-actions-title">Registrar acción</h3>
-        <p className="live-player">{selected ? `#${selected.jerseyNumberSnapshot} ${selected.nameSnapshot}` : 'Selecciona un deportista en cancha.'}</p>
+        <p className="live-player">{selected ? matchPlayerLabel(selected) : 'Selecciona un deportista en cancha.'}</p>
         <div className="live-actions" role="group" aria-label="Acciones técnicas">
           {(Object.keys(ACTION_CATALOG) as Action[]).map((key) => <button
             key={key}
             type="button"
             className="button secondary"
-            disabled={!selected || busy || (key === 'serve' && !canServe)}
+            disabled={!selected || !active || (key === 'serve' && !canServe)}
             aria-pressed={key === action}
             onClick={() => selectAction(key)}
           >{ACTION_CATALOG[key].label}</button>)}
@@ -132,10 +147,24 @@ export function LiveMatchBoard({ view, ownName, busy, message, dispatch }: Props
             key={key}
             type="button"
             className="button secondary"
-            disabled={busy}
+            disabled={!active}
             onClick={(event) => { if (event.detail < 2) void record(key) }}
           >{definition.label}{definition.pointWinner && <span className="live-result-point">{definition.pointWinner === 'own' ? '+ propio' : '+ rival'}</span>}</button>)}
         </div>}
+        <LivePlayerChanges
+          key={engine.version}
+          progress={progress}
+          roster={engine.roster}
+          selected={selected}
+          busy={busy}
+          technicalActive={action !== null}
+          dispatch={dispatch}
+          onOpen={() => selectAction(null)}
+          onSaved={(incomingId) => {
+            selectPlayer(incomingId)
+            selectAction(null)
+          }}
+        />
       </section>
     </div>}
     {engine.phase === 'FIN_SET' && <section className="live-panel" aria-labelledby="live-next-title">
@@ -174,7 +203,7 @@ function eventLabel(event: MatchEvent, players: ReadonlyMap<MatchRoster['id'], M
   switch (event.type) {
     case 'technical_action': {
       const player = players.get(event.payload.playerId)
-      const name = player ? `#${player.jerseyNumberSnapshot} ${player.nameSnapshot}` : 'Deportista'
+      const name = matchPlayerLabel(player)
       return `${name} · ${ACTION_CATALOG[event.payload.action].label} · ${technicalResult(event.payload)?.label}`
     }
     case 'point_awarded':
@@ -186,8 +215,12 @@ function eventLabel(event: MatchEvent, players: ReadonlyMap<MatchRoster['id'], M
     case 'correction':
       return 'Último registro deshecho'
     case 'official_substitution':
-      return 'Sustitución oficial'
-    case 'libero_replacement':
-      return 'Reemplazo de líbero'
+    case 'libero_replacement': {
+      const type = event.type === 'official_substitution' ? 'Sustitución oficial' : 'Reemplazo de líbero'
+      const { outgoingId, incomingId, position, scoreBefore } = event.payload
+      const outgoing = players.get(outgoingId)
+      const incoming = players.get(incomingId)
+      return `${type} · Sale ${matchPlayerLabel(outgoing)} · Entra ${matchPlayerLabel(incoming)} · Set ${set?.number}, ${scoreBefore.own}–${scoreBefore.opponent}, posición ${position}`
+    }
   }
 }
