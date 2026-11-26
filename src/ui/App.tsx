@@ -1,5 +1,5 @@
 import type { LiveMatchManagement } from '../application/live/service'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import type { StorageHealthPort, StorageStatus } from '../application/ports'
 import type { ClubManagement } from '../application/club/service'
@@ -12,7 +12,12 @@ import type { CompetitionManagement } from '../application/competitions/service'
 import { CompetitionsPage } from './competitions/CompetitionsPage'
 import type { MatchManagement } from '../application/matches/service'
 import { MatchesPage } from './matches/MatchesPage'
+import type { ReportManagement } from '../application/reports/service'
+import type { BackupManagement } from '../application/backup/service'
 import { demoAthletes, demoClub, demoMemberships, demoSeason, demoTeams, demoTeamSeasons } from '../demo/data'
+
+const ReportsPage = lazy(async () => ({ default: (await import('./reports/ReportsPage')).ReportsPage }))
+const BackupPage = lazy(async () => ({ default: (await import('./backup/BackupPage')).BackupPage }))
 
 function Home() {
   return <>
@@ -51,7 +56,19 @@ function Demo() {
   </>
 }
 
-export function App({ storageHealth, clubManagement, athleteManagement, membershipManagement, competitionManagement, matchManagement, liveMatchManagement }: { storageHealth: StorageHealthPort; clubManagement: ClubManagement; athleteManagement: AthleteManagement; membershipManagement: MembershipManagement; competitionManagement: CompetitionManagement; matchManagement: MatchManagement; liveMatchManagement: LiveMatchManagement }) {
+interface AppProps {
+  storageHealth: StorageHealthPort
+  clubManagement: ClubManagement
+  athleteManagement: AthleteManagement
+  membershipManagement: MembershipManagement
+  competitionManagement: CompetitionManagement
+  matchManagement: MatchManagement
+  liveMatchManagement: LiveMatchManagement
+  reportManagement: ReportManagement
+  backupManagement: BackupManagement
+}
+
+export function App({ storageHealth, clubManagement, athleteManagement, membershipManagement, competitionManagement, matchManagement, liveMatchManagement, reportManagement, backupManagement }: AppProps) {
   const [storage, setStorage] = useState<StorageStatus | 'checking'>('checking')
   useEffect(() => {
     let active = true
@@ -64,8 +81,46 @@ export function App({ storageHealth, clubManagement, athleteManagement, membersh
 
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Saltar al contenido</a>
-    <header className="app-header"><Link className="brand" to="/" aria-label="IrukaData, inicio"><img src="/icon.svg" alt="" width="42" height="42" /><span>Iruka<span className="brand-light">Data</span></span></Link><nav aria-label="Navegación principal"><NavLink to="/" end>Inicio</NavLink><NavLink to="/equipos">Equipos</NavLink><NavLink to="/temporadas">Temporadas</NavLink><NavLink to="/deportistas">Deportistas</NavLink><NavLink to="/plantillas">Plantillas</NavLink><NavLink to="/torneos">Torneos</NavLink><NavLink to="/partidos">Partidos</NavLink><NavLink to="/demostracion">Demostración</NavLink></nav><span className="local-label">Vóleibol · Local</span></header>
-    <main id="main-content"><Routes><Route path="/" element={<Home />} /><Route path="/equipos" element={<ClubPage key="teams" section="teams" management={clubManagement} />} /><Route path="/temporadas" element={<ClubPage key="seasons" section="seasons" management={clubManagement} />} /><Route path="/deportistas" element={<AthletesPage key="athletes" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} /><Route path="/deportistas/:athleteId" element={<AthletesPage key="athlete-profile" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} /><Route path="/plantillas" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} /><Route path="/plantillas/:teamSeasonId" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} /><Route path="/torneos" element={<CompetitionsPage management={competitionManagement} />} /><Route path="/partidos" element={<MatchesPage management={matchManagement} liveManagement={liveMatchManagement} />} /><Route path="/partidos/:matchId" element={<MatchesPage management={matchManagement} liveManagement={liveMatchManagement} />} /><Route path="/torneos/:competitionId/partidos" element={<MatchesPage management={matchManagement} liveManagement={liveMatchManagement} />} /><Route path="/demostracion" element={<Demo />} /><Route path="*" element={<div className="page-heading"><h1>Página no encontrada</h1><Link className="button" to="/">Volver al inicio</Link></div>} /></Routes></main>
+    <header className="app-header">
+      <Link className="brand" to="/" aria-label="IrukaData, inicio"><img src="/icon.svg" alt="" width="42" height="42" /><span>Iruka<span className="brand-light">Data</span></span></Link>
+      <nav aria-label="Navegación principal">
+        <NavLink to="/" end>Inicio</NavLink>
+        <NavLink to="/equipos">Equipos</NavLink>
+        <NavLink to="/temporadas">Temporadas</NavLink>
+        <NavLink to="/deportistas">Deportistas</NavLink>
+        <NavLink to="/plantillas">Plantillas</NavLink>
+        <NavLink to="/torneos">Torneos</NavLink>
+        <NavLink to="/partidos">Partidos</NavLink>
+        <NavLink to="/historial">Historial</NavLink>
+        <NavLink to="/estadisticas">Estadísticas</NavLink>
+        <NavLink to="/respaldos">Respaldos</NavLink>
+        <NavLink to="/demostracion">Demostración</NavLink>
+      </nav>
+      <span className="local-label">Vóleibol · Local</span>
+    </header>
+    <main id="main-content">
+      <Suspense fallback={<p className="page-heading" role="status">Cargando página…</p>}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/equipos" element={<ClubPage key="teams" section="teams" management={clubManagement} />} />
+          <Route path="/temporadas" element={<ClubPage key="seasons" section="seasons" management={clubManagement} />} />
+          <Route path="/deportistas" element={<AthletesPage key="athletes" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} />
+          <Route path="/deportistas/:athleteId" element={<AthletesPage key="athlete-profile" management={athleteManagement} clubManagement={clubManagement} membershipManagement={membershipManagement} />} />
+          <Route path="/plantillas" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} />
+          <Route path="/plantillas/:teamSeasonId" element={<RostersPage management={membershipManagement} clubManagement={clubManagement} />} />
+          <Route path="/torneos" element={<CompetitionsPage management={competitionManagement} />} />
+          <Route path="/partidos" element={<MatchesPage management={matchManagement} liveManagement={liveMatchManagement} />} />
+          <Route path="/partidos/:matchId" element={<MatchesPage management={matchManagement} liveManagement={liveMatchManagement} />} />
+          <Route path="/torneos/:competitionId/partidos" element={<MatchesPage management={matchManagement} liveManagement={liveMatchManagement} />} />
+          <Route path="/estadisticas" element={<ReportsPage kind="statistics" management={reportManagement} />} />
+          <Route path="/historial" element={<ReportsPage kind="history" management={reportManagement} />} />
+          <Route path="/historial/:matchId" element={<ReportsPage kind="history" management={reportManagement} />} />
+          <Route path="/respaldos" element={<BackupPage management={backupManagement} />} />
+          <Route path="/demostracion" element={<Demo />} />
+          <Route path="*" element={<div className="page-heading"><h1>Página no encontrada</h1><Link className="button" to="/">Volver al inicio</Link></div>} />
+        </Routes>
+      </Suspense>
+    </main>
     <footer><span>IrukaData <span className="footer-divider">/</span> Gestión local de vóleibol</span><span role="status" className={storage === 'unavailable' ? 'storage-warning' : ''}>{storage === 'ready' ? 'Almacenamiento local disponible' : storage === 'checking' ? 'Comprobando almacenamiento local…' : 'Almacenamiento local no disponible. No se pueden guardar datos.'}</span></footer>
   </div>
 }
