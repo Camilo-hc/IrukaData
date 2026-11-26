@@ -1,4 +1,13 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
+
+async function pressPointAt(button: Locator, timeStamp: number) {
+  await expect(button).toBeEnabled()
+  await button.evaluate((element, timestamp) => {
+    const click = new MouseEvent('click', { bubbles: true, detail: 1 })
+    Object.defineProperty(click, 'timeStamp', { value: timestamp })
+    element.dispatchEvent(click)
+  }, timeStamp)
+}
 
 async function prepareMatch(page: Page, withChanges = false) {
   await page.goto('/')
@@ -149,14 +158,16 @@ test('registra dos líberos y una solicitud oficial agrupada sin salir del parti
   await live.getByRole('button', { name: 'Controlada', exact: true }).click()
   await expect(changes.getByText('Termina la jugada antes de registrar cambios.')).toBeVisible()
   await expect(official).toBeDisabled()
-  await ownPoint.click()
+  await pressPointAt(ownPoint, 1_000)
   await expect(own).toHaveText('1')
   await expect(ownPoint).toBeDisabled()
   await expect(player(2)).toContainText('Posición 4')
   await expect(libero).toHaveAccessibleName(/Entra #5/)
   await libero.click()
   await expect(player(5)).toContainText('Posición 4')
-  await rivalPoint.click()
+  await pressPointAt(rivalPoint, 1_100)
+  await expect(rival).toHaveText('1')
+  await pressPointAt(rivalPoint, 1_150)
   await expect(rival).toHaveText('1')
 
   await player(8).click()

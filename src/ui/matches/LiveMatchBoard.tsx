@@ -27,7 +27,7 @@ export function LiveMatchBoard({ view, ownName, busy, message, dispatch }: Props
   const [playerId, selectPlayer] = useState<MatchRoster['id'] | null>(null)
   const [action, selectAction] = useState<Action | null>(null)
   const [editor, setEditor] = useState<{ setId: MatchSet['id']; copy: boolean } | null>(null)
-  const lastManualPoint = useRef(-Infinity)
+  const lastManualPoint = useRef<{ winner: Side; clickAt: number; version: number } | null>(null)
   const progress = currentSet(engine)
   if (!progress) return <p role="alert">El partido todavía no tiene un set abierto.</p>
 
@@ -54,12 +54,15 @@ export function LiveMatchBoard({ view, ownName, busy, message, dispatch }: Props
     if (saved.ok) selectAction(null)
   }
 
-  function manualPoint(winner: Side, clickAt: number) {
+  async function manualPoint(winner: Side, clickAt: number) {
     if (!active || !rallyId) return
-    if (clickAt - lastManualPoint.current < 350) return
-    lastManualPoint.current = clickAt
+    const previous = lastManualPoint.current
+    if (previous?.winner === winner && engine.version <= previous.version + 1 && clickAt - previous.clickAt < 350) return
+    const attempt = { winner, clickAt, version: engine.version }
+    lastManualPoint.current = attempt
     selectAction(null)
-    void dispatch({ type: 'award_point', rallyId, winner })
+    const saved = await dispatch({ type: 'award_point', rallyId, winner })
+    if (!saved.ok && lastManualPoint.current === attempt) lastManualPoint.current = null
   }
 
   return <section className="live-board" aria-labelledby="live-title">
@@ -86,8 +89,8 @@ export function LiveMatchBoard({ view, ownName, busy, message, dispatch }: Props
     </ul>}
     <div className="live-controls">
       {rallyId && <>
-        <button type="button" className="button" disabled={!active} onClick={(event) => { if (event.detail < 2) manualPoint('own', event.timeStamp) }}>Punto propio</button>
-        <button type="button" className="button secondary" disabled={!active} onClick={(event) => { if (event.detail < 2) manualPoint('opponent', event.timeStamp) }}>Punto rival</button>
+        <button type="button" className="button" disabled={!active} onClick={(event) => { if (event.detail < 2) void manualPoint('own', event.timeStamp) }}>Punto propio</button>
+        <button type="button" className="button secondary" disabled={!active} onClick={(event) => { if (event.detail < 2) void manualPoint('opponent', event.timeStamp) }}>Punto rival</button>
       </>}
       <button type="button" className="button secondary" disabled={!canUndo || busy || preparing} onClick={(event) => {
         if (event.detail >= 2) return
