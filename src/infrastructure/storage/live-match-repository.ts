@@ -4,7 +4,7 @@ import type { Match, MatchSet } from '../../domain/match/contracts'
 import { applyMatchCommand, createMatchEngine, currentSet, undoMatchOperation, type MatchEngine, type OperationContext } from '../../domain/match/engine'
 import type { EventBatch } from '../../domain/match/events'
 import { POSITIONS } from '../../domain/match/lineup'
-import { replayTimeline, type MatchTimeline } from '../../domain/match/replay'
+import { reconstructMatch, type MatchTimeline } from '../../domain/match/replay'
 import type { IrukaDatabase } from './database'
 
 interface LoadedMatch {
@@ -44,11 +44,7 @@ export class DexieLiveMatchRepository implements LiveMatchRepository {
       db.matchRosters.where('matchId').equals(match.id).toArray(),
       db.liveBatches.where('matchId').equals(match.id).sortBy('expectedVersion'),
     ])
-    const initial = createMatchEngine({ ...match, version: session.initialVersion }, roster)
-    const timeline = replayTimeline(initial, log)
-    if (timeline.status !== 'replayed' || !timeline.state.sets.length || timeline.state.version !== match.version || timeline.state.phase !== match.phase) {
-      throw new Error('El historial local no reproduce el estado del partido.')
-    }
+    const timeline = reconstructMatch(match, roster, session.initialVersion, log)
     return {
       view: startedView(match, timeline.state, timeline.effective.map(({ batch }) => batch), log),
       timeline,

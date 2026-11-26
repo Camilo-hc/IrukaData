@@ -48,12 +48,22 @@ async function prepareMatch(page: Page, withChanges = false) {
       },
     }
     try {
-      const transaction = database.transaction([...Object.keys(rows), 'matchRosters'], 'readwrite')
+      const transaction = database.transaction([...Object.keys(rows), 'matchRosters', 'athletes', 'memberships'], 'readwrite')
       await new Promise<void>((resolve, reject) => {
         transaction.oncomplete = () => resolve()
         transaction.onabort = () => reject(transaction.error)
         for (const [table, row] of Object.entries(rows)) transaction.objectStore(table).add(row)
-        for (const player of roster) transaction.objectStore('matchRosters').add(player)
+        for (const player of roster) {
+          transaction.objectStore('matchRosters').add(player)
+          transaction.objectStore('athletes').add({
+            id: player.athleteId, name: player.nameSnapshot, searchKey: player.nameSnapshot.toLowerCase(), active: true, revision: 1,
+          })
+          transaction.objectStore('memberships').add({
+            id: player.rosterMembershipId, teamSeasonId: 'team-season', athleteId: player.athleteId,
+            jerseyNumber: player.jerseyNumberSnapshot, activeJerseyNumber: player.jerseyNumberSnapshot,
+            usualRole: 'sin_definir', active: true, revision: 1,
+          })
+        }
       })
     } finally { database.close() }
     await navigator.serviceWorker.ready
@@ -209,6 +219,87 @@ test('registra dos líberos y una solicitud oficial agrupada sin salir del parti
   await expect(player(7)).toContainText('Posición 1')
   await expect(player(10)).toContainText('Líbero por #8')
   expect(page.url()).toBe(matchUrl)
+  await page.setViewportSize({ width: 375, height: 812 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('consulta estadísticas e historial y restaura un respaldo sin conexión', async ({ page, context }) => {
+  test.setTimeout(90_000)
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await prepareMatch(page)
+  const matchUrl = page.url()
+  await context.setOffline(true)
+  await page.getByRole('button', { name: 'Iniciar anotación', exact: true }).click()
+  const live = page.getByRole('region', { name: 'Anotación en vivo' })
+  const player = live.getByRole('button', { name: /Posición 1.*Deportista 1/ })
+  const own = live.getByLabel('Puntos del equipo propio', { exact: true })
+  await player.click()
+  await live.getByRole('button', { name: 'Ataque', exact: true }).click()
+  await live.getByRole('button', { name: 'Continuidad', exact: true }).click()
+  await live.getByRole('button', { name: 'Ataque', exact: true }).click()
+  await live.getByRole('button', { name: /^Punto \+ propio/ }).click()
+  await expect(own).toHaveText('1')
+  await live.getByRole('button', { name: 'Deshacer', exact: true }).click()
+  await expect(own).toHaveText('0')
+  await live.getByRole('button', { name: 'Punto rival', exact: true }).click()
+  await expect(live.getByLabel('Puntos del rival', { exact: true })).toHaveText('1')
+
+  await page.goto('/#/plantillas/team-season')
+  await page.getByRole('button', { name: 'Editar inscripción de Deportista 1', exact: true }).click()
+  const membership = page.getByRole('form', { name: 'Editar inscripción', exact: true })
+  await membership.getByLabel('Dorsal', { exact: true }).fill('55')
+  await membership.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await expect(page.getByRole('table', { name: 'Inscripciones de la plantilla' })).toContainText('#55')
+  await page.getByRole('link', { name: 'Deportista 1', exact: true }).click()
+  await page.getByRole('link', { name: 'Ver estadísticas', exact: true }).click()
+  const stats = page.getByRole('table', { name: 'Estadísticas por deportista' })
+  const cells = stats.getByRole('row', { name: /^Deportista 1 / }).getByRole('cell')
+  await expect(cells.nth(0)).toHaveText('1')
+  await expect(cells.nth(2)).toHaveText('0')
+  await expect(cells.nth(5)).toHaveText('1')
+  await expect(page.getByRole('list', { name: 'Partidos del deportista', exact: true })).toContainText('Dorsal #1')
+  await page.getByLabel('Categoría', { exact: true }).selectOption('sub14')
+  await expect(page.getByText('No hay participaciones registradas para estos filtros.')).toBeVisible()
+  await page.getByLabel('Categoría', { exact: true }).selectOption('sub16')
+  await expect(stats).toBeVisible()
+
+  const navigation = page.getByRole('navigation', { name: 'Navegación principal' })
+  await navigation.getByRole('link', { name: 'Respaldos', exact: true }).click()
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Descargar respaldo JSON', exact: true }).click(),
+  ])
+  const stream = await download.createReadStream()
+  const chunks: Buffer[] = []
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk))
+  const backup = Buffer.concat(chunks)
+  await expect(page.getByText('Respaldo generado. Conserva el archivo descargado.')).toBeVisible()
+  await page.goto(matchUrl)
+  await live.getByRole('button', { name: 'Punto propio', exact: true }).click()
+  await expect(own).toHaveText('1')
+  await navigation.getByRole('link', { name: 'Respaldos', exact: true }).click()
+  const input = page.getByLabel('Archivo de respaldo JSON', { exact: true })
+  await input.setInputFiles({ name: 'invalido.json', mimeType: 'application/json', buffer: Buffer.from('{}') })
+  await expect(page.getByRole('alert')).toContainText('formato o versión')
+  await input.setInputFiles({ name: download.suggestedFilename(), mimeType: 'application/json', buffer: backup })
+  await expect(page.getByRole('heading', { name: 'Vista previa de restauración' })).toBeVisible()
+  await expect(page.getByRole('row', { name: /Eventos de juego/ }).getByRole('cell')).toHaveText(['7', '6'])
+  const restore = page.getByRole('button', { name: 'Restaurar datos', exact: true })
+  await expect(restore).toBeDisabled()
+  await page.getByRole('checkbox', { name: 'Confirmo que quiero reemplazar los datos locales con este respaldo.' }).check()
+  await restore.click()
+  await expect(page.getByText('Respaldo restaurado. Tus datos ya están disponibles.')).toBeVisible()
+
+  await navigation.getByRole('link', { name: 'Historial', exact: true }).click()
+  await page.getByRole('link', { name: 'vs. Club Costa', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Marcador por set' })).toContainText('0–1')
+  await page.getByText('Convocatoria guardada', { exact: true }).click()
+  await expect(page.getByRole('list', { name: 'Convocatoria guardada' })).toContainText('#1 Deportista 1')
+  const history = page.getByRole('list', { name: 'Registros en orden de anotación' })
+  await expect(history.getByRole('listitem').filter({ hasText: 'Ataque · Punto' })).toContainText('Deshecho')
+  await expect(history).toContainText('Último registro deshecho')
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Marcador por set' })).toContainText('0–1')
   await page.setViewportSize({ width: 375, height: 812 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
