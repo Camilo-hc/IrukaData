@@ -65,8 +65,7 @@ export function LivePlayerChanges({ progress, roster, selected, busy, technicalA
     <div className="live-actions live-change-controls">
       <button type="button" className="button secondary" disabled={busy || (!officialOptions.length && !pending.length)}
         aria-expanded={onlyOfficialOption ? undefined : Boolean(official)}
-        onClick={(event) => {
-          if (event.detail >= 2) return
+        onClick={() => {
           onOpen()
           if (onlyOfficialOption && selected) {
             const selections = [{ outgoingId: selected.id, incomingId: onlyOfficialOption.id }]
@@ -78,8 +77,7 @@ export function LivePlayerChanges({ progress, roster, selected, busy, technicalA
       </button>
       <button type="button" className="button secondary" disabled={busy || !liberoOptions.length}
         aria-expanded={onlyLiberoOption ? undefined : open?.type === 'libero'}
-        onClick={(event) => {
-          if (event.detail >= 2) return
+        onClick={() => {
           onOpen()
           if (onlyLiberoOption) chooseLibero(onlyLiberoOption.id)
           else setDraft(open?.type === 'libero' ? null : { type: 'libero' })
@@ -107,21 +105,21 @@ export function LivePlayerChanges({ progress, roster, selected, busy, technicalA
         <ul className="live-history" aria-label="Cambios por confirmar">
           {pending.map(({ outgoingId, incomingId }) => <li key={outgoingId}>Sale {matchPlayerLabel(players.get(outgoingId))} · Entra {matchPlayerLabel(players.get(incomingId))}</li>)}
         </ul>
-        <button type="button" className="button" disabled={busy} onClick={(event) => {
-          if (event.detail < 2) void save({ type: 'official_substitution', setId: progress.set.id, selections: pending }, null)
+        <button type="button" className="button" disabled={busy} onClick={() => {
+          void save({ type: 'official_substitution', setId: progress.set.id, selections: pending }, null)
         }}>Confirmar {pending.length} {pending.length === 1 ? 'cambio' : 'cambios'} de la solicitud</button>
       </>}
       {officialOptions.length > 0
         ? <div className="live-actions live-change-options" role="group" aria-label="Entrantes para cambio oficial">
           {officialOptions.map((player) => <button key={player.id} type="button" className="button secondary" disabled={busy}
-            onClick={(event) => { if (event.detail < 2) chooseOfficial(player.id) }}>Entra {matchPlayerLabel(player)}</button>)}
+            onClick={() => chooseOfficial(player.id)}>Entra {matchPlayerLabel(player)}</button>)}
         </div>
         : <p className="live-change-note">Selecciona otra posición para añadir un cambio elegible o confirma la solicitud.</p>}
     </div>}
     {open?.type === 'libero' && liberoOptions.length > 1 &&
       <div className="live-actions live-change-options" role="group" aria-label="Entrantes para reemplazo de líbero">
         {liberoOptions.map((player) => <button key={player.id} type="button" className="button secondary" disabled={busy}
-          onClick={(event) => { if (event.detail < 2) chooseLibero(player.id) }}>Entra {matchPlayerLabel(player)}</button>)}
+          onClick={() => chooseLibero(player.id)}>Entra {matchPlayerLabel(player)}</button>)}
       </div>}
     {(open || onlyOfficialOption || onlyLiberoOption) && !rallyOpen &&
       <p className="live-change-note">Registra el cambio con el balón fuera de juego y antes del saque.</p>}

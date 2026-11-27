@@ -15,10 +15,6 @@ El proyecto prioriza el funcionamiento local y sin conexión, una interfaz en es
 - Conservar el historial deportivo y ofrecer estadísticas por jugador, equipo, categoría, temporada y torneo.
 - Trabajar con datos locales, sin requerir cuentas, nube ni un servidor de negocio.
 
-## Funcionalidades previstas
-
-El último hito está dedicado a la validación de partidos completos en cancha, la accesibilidad táctil y las pruebas de recuperación y restauración del MVP.
-
 El registro individual cubre a los jugadores del propio club. El rival se identifica por su nombre, marcador y equipo al servicio.
 
 ## Funcionalidades implementadas
@@ -80,7 +76,7 @@ Los partidos requieren una participación, torneo, equipo, asociación y tempora
 | Hito 4 — Panel de anotación en vivo | Interfaz táctil para acciones y puntos, eventos recientes, deshacer, guardado automático y reanudación. | Implementado |
 | Hito 5 — Cambios oficiales y reemplazos de líbero | Flujos de cambio dentro del panel, validación de elegibilidad y reingresos, límites configurables y seguimiento del vínculo líbero–jugador regular. | Implementado |
 | Hito 6 — Estadísticas, historial y respaldo | Estadísticas derivadas de eventos, filtros, consulta del historial y exportación/importación de respaldos. | Implementado |
-| Hito 7 — Calidad y lanzamiento del MVP | Validación de partidos completos offline, accesibilidad táctil, pulsaciones repetidas, recuperación, restauración de respaldos y preparación para uso real. | Planificado |
+| Hito 7 — Calidad y lanzamiento del MVP | Validación del partido completo offline, controles táctiles, reapertura del navegador, respaldo restaurable y guía de uso. | Verificado para piloto local |
 
 ## Tecnologías
 
@@ -118,7 +114,19 @@ pnpm preview
 
 Abrir `http://127.0.0.1:4173` con acceso a los recursos locales y esperar a que termine la preparación del service worker. Después puede recargarse sin conexión. El modo de desarrollo no instala service worker. La primera carga de un dispositivo nuevo requiere obtener los recursos locales. Vite solo sirve archivos durante desarrollo/previsualización; no existe servidor de negocio ni base de datos remota.
 
-Mantener el mismo navegador, perfil y origen (protocolo, host y puerto): cambiar `localhost` por `127.0.0.1`, o cambiar puerto, crea otro almacenamiento. No se ha habilitado acceso por LAN; instalar en una tablet requerirá preparar un origen HTTPS confiable. La estrategia de distribución al dispositivo real sigue pendiente.
+Mantén el mismo navegador, perfil y origen (protocolo, host y puerto). Cambiar `localhost` por `127.0.0.1` o usar otro puerto abre un almacenamiento distinto. Para usar la aplicación desde otro dispositivo, prepara un origen HTTPS de confianza accesible desde ese dispositivo. `127.0.0.1` siempre apunta al dispositivo desde el que abres el navegador. [Contextos seguros en MDN](https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Secure_Contexts)
+
+Puedes usar el navegador directamente o instalar IrukaData como aplicación web. En Chrome de escritorio, abre el menú del navegador y busca **Instalar página como aplicación**. Hazlo desde el mismo perfil y origen que usarás para anotar. [Instalar aplicaciones web en Chrome](https://support.google.com/chrome/answer/9658361?hl=es)
+
+## Guía rápida de cancha
+
+1. **Antes del partido.** Abre la compilación en el navegador que llevarás a cancha. Una vez cargada, detén la previsualización o desconecta la red si usas un origen remoto y vuelve a abrir la misma dirección. Comprueba que se muestran los partidos y que el almacenamiento local está disponible. En **Respaldos** puedes solicitar almacenamiento persistente y guardar una copia JSON.
+2. **Prepara la ficha.** Selecciona el equipo y la temporada en **Torneos**, crea el partido y confirma la convocatoria. Asigna las seis posiciones iniciales y el primer saque. Usa **Iniciar anotación** para abrir el panel.
+3. **Registra en vivo.** Elige una persona en cancha, la acción y su resultado. Una acción terminal suma el punto correspondiente. Usa **Punto propio** o **Punto rival** cuando corresponda anotar el resultado manualmente. Entre jugadas puedes registrar un cambio oficial o un reemplazo de líbero junto a las acciones.
+4. **Continúa y corrige.** Después de cada set, confirma seis titulares y el saque del siguiente. **Deshacer** corrige la última operación completa. Si se cierra el navegador, vuelve a la ficha en el mismo perfil para retomar el marcador, la cancha y la jugada abierta.
+5. **Cierra y respalda.** Al terminar revisa el resultado en **Historial** y exporta el JSON desde **Respaldos**. Para probar la recuperación en otro perfil, abre la aplicación allí, selecciona el JSON y revisa la vista previa. La restauración reemplaza los datos locales de ese perfil.
+
+Para el primer ensayo usa datos ficticios en un perfil separado. Prueba un 2–1 con sets de 25–23, 23–25 y 16–14, interrumpe el segundo set con una jugada abierta y verifica que el respaldo recupera los tres marcadores.
 
 ## Verificaciones
 
@@ -139,6 +147,13 @@ pnpm test:e2e
 ```
 
 La descarga inicial del navegador de pruebas requiere internet. El build no descarga recursos de red.
+
+Para repetir solo el partido de aceptación del MVP:
+
+```powershell
+pnpm build
+pnpm test:e2e tests/e2e/mvp-match.spec.ts
+```
 
 ## Alcance actual del modo offline
 
