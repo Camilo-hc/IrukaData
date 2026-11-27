@@ -154,6 +154,7 @@ button.lineup-slot[aria-pressed="true"] { border-color: #00766b; outline: 2px so
 .lineup-reserves p { margin: 0; }
 .lineup-service .checkbox-label { overflow-wrap: anywhere; }
 .live-board { display: grid; gap: 1rem; margin-bottom: 1rem; }
+.live-board button { touch-action: manipulation; }
 .live-board > h2, .live-board h3, .live-board p { margin: 0; }
 .live-scoreboard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; padding: clamp(.8rem, 3vw, 1.5rem); background: #102c38; color: #fff; border-radius: 12px; }
 .live-scoreboard-heading, .live-serving { grid-column: 1 / -1; }
@@ -186,6 +187,11 @@ button.lineup-slot[aria-pressed="true"] { border-color: #00766b; outline: 2px so
 .live-history { list-style: none; margin: 0; padding: 0; }
 .live-history li { padding: .4rem 0; border-top: 1px solid #e2edf0; overflow-wrap: anywhere; }
 @media (max-width: 730px) { .live-grid { grid-template-columns: 1fr; } .live-controls .button { flex-grow: 1; } }
+@media (min-width: 731px) and (max-height: 850px) {
+  .live-scoreboard { padding: .75rem; gap: .4rem; }
+  .live-side { padding: .45rem; }
+  .live-points { font-size: clamp(2.5rem, 6vh, 3.5rem); }
+}
 @media (max-width: 760px) { .match-grid { grid-template-columns: 1fr; } }
 @media (min-width: 761px) { .app-header nav { flex-wrap: wrap; gap: .2rem 1.2rem; } }
 
