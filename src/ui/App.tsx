@@ -1,5 +1,5 @@
 import type { LiveMatchManagement } from '../application/live/service'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Route, Routes } from 'react-router-dom'
 import type { StorageHealthPort, StorageStatus } from '../application/ports'
 import type { ClubManagement } from '../application/club/service'
@@ -70,6 +70,7 @@ interface AppProps {
 
 export function App({ storageHealth, clubManagement, athleteManagement, membershipManagement, competitionManagement, matchManagement, liveMatchManagement, reportManagement, backupManagement }: AppProps) {
   const [storage, setStorage] = useState<StorageStatus | 'checking'>('checking')
+  const main = useRef<HTMLElement>(null)
   useEffect(() => {
     let active = true
     void storageHealth.check().then(
@@ -80,7 +81,10 @@ export function App({ storageHealth, clubManagement, athleteManagement, membersh
   }, [storageHealth])
 
   return <div className="app-shell">
-    <a className="skip-link" href="#main-content">Saltar al contenido</a>
+    <a className="skip-link" href="#main-content" onClick={(event) => {
+      event.preventDefault()
+      main.current?.focus()
+    }}>Saltar al contenido</a>
     <header className="app-header">
       <Link className="brand" to="/" aria-label="IrukaData, inicio"><img src="/icon.svg" alt="" width="42" height="42" /><span>Iruka<span className="brand-light">Data</span></span></Link>
       <nav aria-label="Navegación principal">
@@ -98,7 +102,7 @@ export function App({ storageHealth, clubManagement, athleteManagement, membersh
       </nav>
       <span className="local-label">Vóleibol · Local</span>
     </header>
-    <main id="main-content">
+    <main id="main-content" ref={main} tabIndex={-1}>
       <Suspense fallback={<p className="page-heading" role="status">Cargando página…</p>}>
         <Routes>
           <Route path="/" element={<Home />} />

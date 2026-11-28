@@ -3,9 +3,10 @@ import { BACKUP_COUNTS, type BackupManagement, type BackupPreview } from '../../
 import { downloadText } from '../shared/download'
 
 const dateTime = new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short' })
+const weekInMilliseconds = 7 * 24 * 60 * 60 * 1_000
 
 export function BackupPage({ management }: { management: BackupManagement }) {
-  const [lastExport, setLastExport] = useState<string | null>(null)
+  const [lastExport, setLastExport] = useState<{ date: Date; olderThanWeek: boolean } | null>(null)
   const [preview, setPreview] = useState<{ file: string; value: BackupPreview } | null>(null)
   const [confirmed, setConfirmed] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -17,7 +18,11 @@ export function BackupPage({ management }: { management: BackupManagement }) {
 
   useEffect(() => {
     let active = true
-    void management.lastExport().then((value) => { if (active) setLastExport(value) }, () => {})
+    void management.lastExport().then((value) => {
+      if (!active || !value) return
+      const date = new Date(value)
+      if (Number.isFinite(date.getTime())) setLastExport({ date, olderThanWeek: Date.now() - date.getTime() > weekInMilliseconds })
+    }, () => {})
     if (navigator.storage?.persisted) {
       void navigator.storage.persisted().then((value) => { if (active) setPersistent(value) }, () => {})
     }
@@ -31,7 +36,7 @@ export function BackupPage({ management }: { management: BackupManagement }) {
     try {
       const data = await management.exportBackup()
       downloadText(data.filename, data.text, 'application/json')
-      setLastExport(data.exportedAt)
+      setLastExport({ date: new Date(data.exportedAt), olderThanWeek: false })
       setNotice('Respaldo generado. Conserva el archivo descargado.')
       await management.markExported(data.exportedAt)
     } catch {
@@ -92,7 +97,10 @@ export function BackupPage({ management }: { management: BackupManagement }) {
     {error && <p className="form-error" role="alert">{error}</p>}
     <section className="live-panel" aria-labelledby="backup-export">
       <h2 id="backup-export">Exportar respaldo</h2>
-      <p>{lastExport ? 'Último respaldo generado en este navegador: ' + dateTime.format(new Date(lastExport)) : 'Todavía no se ha generado un respaldo en este navegador.'}</p>
+      {lastExport && <p>Último respaldo generado en este navegador el {dateTime.format(lastExport.date)}.</p>}
+      {(!lastExport || lastExport.olderThanWeek) && <p className="storage-warning">
+        {lastExport ? 'El último respaldo tiene más de una semana.' : 'Todavía no se ha generado un respaldo en este navegador.'}
+      </p>}
       <div className="form-actions"><button type="button" className="button" disabled={busy} onClick={() => void exportBackup()}>Descargar respaldo JSON</button></div>
     </section>
     <section className="live-panel" aria-labelledby="backup-import">
